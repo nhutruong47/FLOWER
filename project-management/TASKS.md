@@ -28,7 +28,7 @@ A blocked task keeps its status and references its BLK ID.
 | TASK-002 | Repository foundation files | 0–1 | Orchestrator | DONE | TASK-001 |
 | TASK-003 | Install local toolchain (JDK 21, Node.js LTS) | 1 | Orchestrator + owner | DONE | – |
 | TASK-004 | Project governance scaffold | 1 | Orchestrator | DONE | TASK-001 |
-| TASK-005 | Commit Phase 1 work and push the feature branch | 1 | Orchestrator | IN_PROGRESS | TASK-002, TASK-004, owner approval |
+| TASK-005 | Commit Phase 1 work and push the feature branch | 1 | Orchestrator | DONE | TASK-002, TASK-004, owner approval |
 | TASK-006 | Business analysis: answer B1–B10, draft processes and roles | 2 | business-analyst | PENDING | TASK-004 |
 | TASK-007 | Decide the local Docker strategy (T4) | 1–4 | Owner | PENDING | – |
 
@@ -64,9 +64,9 @@ A blocked task keeps its status and references its BLK ID.
 
 ### TASK-005: Commit Phase 1 work and push the feature branch
 - **Acceptance criteria**
-  - [ ] Commits on `chore/phase-1-foundation` with Conventional Commit messages.
-  - [ ] Branch pushed to `origin`; `main` untouched.
-  - [ ] Pull request opened, if the owner wants one (T8).
+  - [x] Commits on `chore/phase-1-foundation` with Conventional Commit messages. Evidence: `b234db6 chore: set up repository foundation and project governance (TASK-002, TASK-004)`, 43 files.
+  - [x] Branch pushed to `origin`; `main` untouched. Evidence: `git ls-remote origin` shows `refs/heads/chore/phase-1-foundation` = `b234db6` and `refs/heads/main` = `d776e5e`.
+  - [x] Pull request opened, if the owner wants one (T8). Not requested. The link to open one is <https://github.com/nhutruong47/FLOWER/pull/new/chore/phase-1-foundation> (the `gh` CLI is not installed).
 
 ### TASK-006: Business analysis kickoff
 - **Acceptance criteria**

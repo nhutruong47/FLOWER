@@ -13,7 +13,9 @@ Newest entries first. Each entry gives the date, what was done (with task IDs), 
 - SHA-256 checksums match the publishers' values. JDK: `bbebea14…a4ad4fbf2` (Adoptium `.sha256.txt`). Node: `e2edda75…a2474f1f7` (nodejs.org `SHASUMS256.txt`).
 - In a shell with the new PATH: `java -version` → `openjdk 21.0.13.1 2026-11-17 LTS` (Temurin-21.0.13.1+2); `javac 21.0.13.1`; `node -v` → `v26.13.1`; `npm -v` → `11.20.0`.
 
-**Next:** TASK-005 (commit and push), then Phase 2 (TASK-006), which needs the owner's answers to B1–B10.
+**TASK-005 → DONE:** commit `b234db6` (43 files) pushed to `origin/chore/phase-1-foundation`, confirmed with `git ls-remote`. `main` is unchanged at `d776e5e`. Pull request link: <https://github.com/nhutruong47/FLOWER/pull/new/chore/phase-1-foundation>.
+
+**Next:** Phase 2 (TASK-006) needs the owner's answers to B1–B10. The owner also needs to decide whether to merge into `main`.
 
 ## 2026-11-23: Phase 1, project governance scaffold (TASK-004 → CODE_REVIEW)
 
