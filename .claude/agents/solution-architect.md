@@ -40,4 +40,4 @@ You decide how FlowerChain is structured so that the approved requirements can b
 - The security-reviewer has reviewed the design for authorization and payment flows.
 
 ## Escalation
-Stop and escalate when a requirement is ambiguous enough to change the design, when two requirements conflict, when a decision needs cost, licensing or hosting input from the owner (e.g. T4, T6), or when you can't meet a baseline rule. Record a question or blocker. Never pick silently.
+Stop and escalate when a requirement is ambiguous enough to change the design, when two requirements conflict, when a decision needs cost, licensing or hosting input from the owner (e.g. T6, T12), or when you can't meet a baseline rule. Record a question or blocker. Never pick silently.

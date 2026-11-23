@@ -30,7 +30,8 @@ A blocked task keeps its status and references its BLK ID.
 | TASK-004 | Project governance scaffold | 1 | Orchestrator | DONE | TASK-001 |
 | TASK-005 | Commit Phase 1 work and push the feature branch | 1 | Orchestrator | DONE | TASK-002, TASK-004, owner approval |
 | TASK-006 | Business analysis: answer B1–B10, draft processes and roles | 2 | business-analyst | PENDING | TASK-004 |
-| TASK-007 | Decide the local Docker strategy (T4) | 1–4 | Owner | PENDING | – |
+| TASK-007 | Decide the local Docker strategy (T4) | 1–4 | Owner | DONE | – |
+| TASK-008 | Merge Phase 1 into `main` and push | 1 | Orchestrator | IN_PROGRESS | TASK-005, owner approval |
 
 ## Details
 
@@ -75,4 +76,10 @@ A blocked task keeps its status and references its BLK ID.
 
 ### TASK-007: Decide the local Docker strategy
 - **Acceptance criteria**
-  - [ ] The owner picks Docker Desktop (with the licence confirmed), an alternative, or CI-only integration tests. Recorded as a DEC entry.
+  - [x] The owner picks Docker Desktop (with the licence confirmed), an alternative, or CI-only integration tests. Recorded as a DEC entry. Evidence: owner instruction "KO CẦN CÀI DOCKER" (no need to install Docker), 2026-11-23, giving **CI-only integration tests** (DEC-015). Follow-up question T12: how to run PostgreSQL locally by hand.
+
+### TASK-008: Merge Phase 1 into `main` and push
+- **Scope:** fast-forward `main` to the Phase 1 branch and push. Approved by the owner: "CỨ PUSH LÊN MAIN NHÉ" (just push to main), 2026-11-23.
+- **Acceptance criteria**
+  - [ ] Local `main` contains every Phase 1 commit (fast-forward only, no history rewrite).
+  - [ ] `origin/main` equals local `main` (checked with `git ls-remote`).

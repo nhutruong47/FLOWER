@@ -43,5 +43,5 @@ Write pattern / locking: …
 ## Stop conditions
 - Data ownership or the meaning of data is unclear (e.g. pricing, B9).
 - A change could lose or rewrite existing data. Get owner approval and a backup plan first.
-- Docker is not available for Testcontainers (T4): verify in CI, or report a blocker. Never claim verification you didn't run.
+- Local Docker is not used (DEC-015): verify migrations through the CI pipeline. If CI isn't available yet, report a blocker. Never claim verification you didn't run.
 - Any request to run SQL against a shared, staging or production database: refuse and escalate.

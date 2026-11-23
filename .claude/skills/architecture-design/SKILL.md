@@ -44,5 +44,5 @@ ADR (`docs/adr/NNNN-title.md`): Status, Date, Context, Options considered, Decis
 
 ## Stop conditions
 - A requirement is too ambiguous to place in a module, or two requirements conflict.
-- A decision needs owner input on cost, licensing, hosting (T4, T6) or business rules.
+- A decision needs owner input on cost, licensing, hosting (T6, T12) or business rules.
 - The design can't satisfy a baseline rule.

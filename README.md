@@ -25,7 +25,7 @@ frontend/
   storefront/         Public customer shop
   admin/              Internal management for head office and branches
   packages/shared/    Shared types, API client and UI pieces
-infra/                docker-compose (PostgreSQL), Dockerfiles
+infra/                Dockerfiles (images are built in CI)
 docs/                 Architecture decisions, requirements, open questions
 .github/workflows/    CI pipelines
 ```
@@ -37,7 +37,7 @@ Each folder is added in the phase that first needs it.
 - Git
 - JDK 21 (Eclipse Temurin)
 - Node.js LTS, which includes npm
-- Docker: needed later for local PostgreSQL and Testcontainers (not decided yet, see [open questions](docs/requirements/open-questions.md))
+- Docker is **not** needed locally (DEC-015). Integration tests with Testcontainers run in GitHub Actions.
 
 You don't need to install Maven: the backend will include the Maven wrapper (`mvnw`).
 

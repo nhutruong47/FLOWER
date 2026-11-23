@@ -2,6 +2,21 @@
 
 Newest entries first. Each entry gives the date, what was done (with task IDs), the evidence, and what's next.
 
+## 2026-11-23: Docker decision and merge to main (TASK-007 → DONE, TASK-008)
+
+- The owner instructed: finish the remaining setup, push to `main`, and don't install Docker ("TỰ LÀM ĐI PHẦN CÒN LẠI, CỨ PUSH LÊN MAIN NHÉ, KO CẦN CÀI DOCKER").
+- **DEC-015 (ACCEPTED): no local Docker.** Testcontainers integration tests run only in GitHub Actions, so the CI pipeline must be ready at the start of Phase 7. New open question **T12**: how to run PostgreSQL locally by hand.
+- Updated everything that referred to the open Docker question: `CLAUDE.md` §9, `README.md` (layout and prerequisites), `open-questions.md` (T4 answered, T12 added), `ROADMAP.md`, the devops-engineer, database-engineer and solution-architect agents, and the deployment, database-design, testing and architecture-design skills. Historical records (DEC-009, DEC-014, ADR-0001) are left as they were.
+- Not done, because only the owner can do them on their machine: restarting the IDE (so the PATH change takes effect) and closing the leftover Windows admin dialog. Stopping those installer processes automatically was refused earlier by the safety check.
+
+## 2026-11-23: Orchestration check, autonomous development mode started (no task executed)
+
+- **State verified:** working tree clean; `chore/phase-1-foundation` = `origin` = `f22b9e9`; `main` = `d776e5e` (not merged). The records match Git. Commands: `git status -sb`, `git ls-remote origin`.
+- **Eligibility:** TASK-001 to TASK-005 are DONE. TASK-006 (Phase 2) has its dependencies met, but its acceptance criteria require **owner answers to B1–B10**, all still open, so it cannot run on its own without inventing requirements. TASK-007 is an owner decision. **No task can run autonomously.**
+- **Requirements:** REQ-001 to REQ-012 are DRAFT or NEEDS_CONFIRMATION; nothing is APPROVED, so no feature work is allowed (Phase 3 gate).
+- **Environment note:** this Claude session started before the PATH change, so `java` and `node` aren't visible to it. Restart the IDE before any build task. The leftover winget/msiexec admin dialog is still open.
+- **Next recommended task:** TASK-006, once the owner provides answers.
+
 ## 2026-11-23: Phase 1 closed (TASK-002, TASK-003, TASK-004 → DONE)
 
 **Done**

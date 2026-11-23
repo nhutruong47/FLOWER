@@ -24,7 +24,7 @@ Questions that must be answered before the related features are built. No busine
 | T1 | Backend build tool | **Maven (wrapper)**, decided 2026-11-23 |
 | T2 | Frontend structure | **Two apps (storefront, admin) plus a shared package**, decided 2026-11-23 |
 | T3 | Node package manager | **npm (workspaces)**, decided 2026-11-23 |
-| T4 | Local Docker: Docker Desktop (needs WSL2, admin rights, and a paid licence at larger companies), an alternative, or CI only? | _open_ |
+| T4 | Local Docker: Docker Desktop (needs WSL2, admin rights, and a paid licence at larger companies), an alternative, or CI only? | **No local Docker.** Integration tests run in CI only. Owner, 2026-11-23 (DEC-015) |
 | T5 | Login method: server session or JWT? Social login for customers? | _open_ |
 | T6 | Hosting and deployment target (cloud provider, VPS, on-premises)? | _open_ |
 | T7 | Is the GitHub repository public or private? Keep the name "FLOWER" or rename it to "FlowerChain"? | _open_ |
@@ -32,3 +32,4 @@ Questions that must be answered before the related features are built. No busine
 | T9 | Enforce backend module boundaries with Spring Modulith, ArchUnit, or by convention only? | _open_ |
 | T10 | PostgreSQL major version to target? | _open_ |
 | T11 | Which frontend unit and component test tool? (The brief lists only Playwright, which is for end-to-end tests.) | _open_ (decide in Phase 4) |
+| T12 | Without local Docker (DEC-015), how do developers run PostgreSQL to try the app by hand: portable PostgreSQL binaries (no admin), a shared development database, or automated tests only? | _open_ (decide before Phase 7) |

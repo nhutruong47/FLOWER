@@ -25,6 +25,6 @@ Each phase starts only after the previous phase's exit criteria are met **and** 
 
 - **Business questions B1–B10** ([open-questions.md](../docs/requirements/open-questions.md)): they decide the module list and scope from Phase 2 onwards.
 - **REQ-004 per-branch pricing** is NEEDS_CONFIRMATION.
-- **T4 local Docker:** without it, integration tests run only in CI. This affects Phases 7 and 10.
+- **No local Docker (DEC-015):** integration tests run only in CI, so a CI pipeline that runs Testcontainers (otherwise Phase 11 work) must be in place **at the start of Phase 7**. How to run PostgreSQL locally by hand is still open (T12).
 - **T6 hosting target:** unknown. It shapes Phases 11 and 12.
 - **DEC-010 conventions** are PROPOSED until confirmed in Phases 4 and 5.

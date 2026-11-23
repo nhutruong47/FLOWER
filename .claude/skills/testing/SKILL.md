@@ -42,5 +42,5 @@ Verdict: PASS | FAIL (BUG-0xx, …)
 
 ## Stop conditions
 - An acceptance criterion can't be tested as written: send it back to the business-analyst.
-- The test environment is missing (JDK, Node, Docker; see BLK-001 and T4). Report it; never mark PASS.
+- The test environment is missing: JDK or Node locally, or the CI pipeline for Testcontainers (no local Docker, DEC-015). Report it; never mark PASS.
 - A test is flaky and you can't find out why. Escalate instead of retrying until it passes.

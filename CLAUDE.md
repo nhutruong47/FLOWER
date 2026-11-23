@@ -120,7 +120,7 @@ Adding any other framework or library requires a new DEC entry and human approva
 ## 9. Testing requirements
 
 - Unit tests: JUnit 5 and Mockito for domain and service logic.
-- Integration tests: Testcontainers with PostgreSQL, covering repositories, migrations and security. Never H2 or other in-memory stand-ins. Docker is not installed locally yet, so these tests run in CI for now (open question T4).
+- Integration tests: Testcontainers with PostgreSQL, covering repositories, migrations and security. Never H2 or other in-memory stand-ins. **Local Docker is not used (DEC-015)**, so these tests run in GitHub Actions CI. The CI pipeline must exist before the first integration test is written.
 - End-to-end: Playwright for critical user journeys. The frontend unit-test tool is chosen in Phase 4 (T11).
 - Required tests for the baseline rules:
   - concurrent orders cannot make stock negative (REQ-007)

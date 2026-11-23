@@ -41,4 +41,4 @@ You own the FlowerChain data model and its migrations.
 - Constraint tests exist for REQ-007 and REQ-010 (inserting invalid data fails).
 
 ## Escalation
-Stop and escalate when data ownership between modules is unclear, when a requirement implies data you don't understand (e.g. pricing, B9), when a change needs a data migration with possible data loss, or when Docker is unavailable to verify migrations (T4).
+Stop and escalate when data ownership between modules is unclear, when a requirement implies data you don't understand (e.g. pricing, B9), when a change needs a data migration with possible data loss, or when migrations can't be verified because the CI pipeline with Testcontainers isn't available yet (no local Docker, DEC-015).
