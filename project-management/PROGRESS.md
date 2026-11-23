@@ -7,6 +7,7 @@ Newest entries first. Each entry gives the date, what was done (with task IDs), 
 - The owner instructed: finish the remaining setup, push to `main`, and don't install Docker ("TỰ LÀM ĐI PHẦN CÒN LẠI, CỨ PUSH LÊN MAIN NHÉ, KO CẦN CÀI DOCKER").
 - **DEC-015 (ACCEPTED): no local Docker.** Testcontainers integration tests run only in GitHub Actions, so the CI pipeline must be ready at the start of Phase 7. New open question **T12**: how to run PostgreSQL locally by hand.
 - Updated everything that referred to the open Docker question: `CLAUDE.md` §9, `README.md` (layout and prerequisites), `open-questions.md` (T4 answered, T12 added), `ROADMAP.md`, the devops-engineer, database-engineer and solution-architect agents, and the deployment, database-design, testing and architecture-design skills. Historical records (DEC-009, DEC-014, ADR-0001) are left as they were.
+- **TASK-008 → DONE:** `main` fast-forwarded `d776e5e..d4210eb` and pushed. `git ls-remote origin` confirms `refs/heads/main` = `d4210eb`, the same as local.
 - Not done, because only the owner can do them on their machine: restarting the IDE (so the PATH change takes effect) and closing the leftover Windows admin dialog. Stopping those installer processes automatically was refused earlier by the safety check.
 
 ## 2026-11-23: Orchestration check, autonomous development mode started (no task executed)

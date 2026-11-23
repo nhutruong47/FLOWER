@@ -8,7 +8,7 @@
 | Item | State |
 |---|---|
 | Phase | **1, Project governance: DONE** (owner approved 2026-11-23). **Phase 2, Business analysis: NEXT**, waiting for owner answers to B1–B10. |
-| Git | Phase 1 is being merged into `main` (TASK-008). Owner instruction: push to `main`. |
+| Git | All Phase 1 work is on **`main`** at GitHub (fast-forward merge, TASK-008 DONE). Work continues on `main`, as the owner instructed. `chore/phase-1-foundation` is kept for reference. |
 | Application code | None. No business features exist. None may be built before Phase 3 approval. |
 | Requirements | REQ-001 to REQ-012: baseline rules from the owner. 11 are DRAFT; REQ-004 is NEEDS_CONFIRMATION. None APPROVED. |
 | Open questions | Business B1–B10 (B2, B3 partly answered); technical T5–T12 |

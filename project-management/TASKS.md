@@ -31,7 +31,7 @@ A blocked task keeps its status and references its BLK ID.
 | TASK-005 | Commit Phase 1 work and push the feature branch | 1 | Orchestrator | DONE | TASK-002, TASK-004, owner approval |
 | TASK-006 | Business analysis: answer B1–B10, draft processes and roles | 2 | business-analyst | PENDING | TASK-004 |
 | TASK-007 | Decide the local Docker strategy (T4) | 1–4 | Owner | DONE | – |
-| TASK-008 | Merge Phase 1 into `main` and push | 1 | Orchestrator | IN_PROGRESS | TASK-005, owner approval |
+| TASK-008 | Merge Phase 1 into `main` and push | 1 | Orchestrator | DONE | TASK-005, owner approval |
 
 ## Details
 
@@ -81,5 +81,5 @@ A blocked task keeps its status and references its BLK ID.
 ### TASK-008: Merge Phase 1 into `main` and push
 - **Scope:** fast-forward `main` to the Phase 1 branch and push. Approved by the owner: "CỨ PUSH LÊN MAIN NHÉ" (just push to main), 2026-11-23.
 - **Acceptance criteria**
-  - [ ] Local `main` contains every Phase 1 commit (fast-forward only, no history rewrite).
-  - [ ] `origin/main` equals local `main` (checked with `git ls-remote`).
+  - [x] Local `main` contains every Phase 1 commit (fast-forward only, no history rewrite). Evidence: `git merge --ff-only chore/phase-1-foundation` → "Updating d776e5e..d4210eb, Fast-forward".
+  - [x] `origin/main` equals local `main` (checked with `git ls-remote`). Evidence: `git push origin main` → `d776e5e..d4210eb main -> main`; `git ls-remote origin` → `refs/heads/main` = `d4210eb`, matching `git rev-parse main`.
