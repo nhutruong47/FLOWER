@@ -1,0 +1,24 @@
+# Store and check out text files with LF line endings on every OS,
+# so scripts behave the same on Windows, in Docker and in GitHub Actions.
+* text=auto eol=lf
+
+# Windows batch scripts require CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Unix scripts must stay LF
+mvnw text eol=lf
+*.sh text eol=lf
+
+# Binary files: never convert or diff as text
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.jar   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.pdf   binary

@@ -1,0 +1,53 @@
+# ---- Secrets and local environment (never commit) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# ---- Claude Code personal settings (team settings are in .claude/settings.json) ----
+.claude/settings.local.json
+
+# ---- Java / Maven ----
+target/
+*.class
+hs_err_pid*
+replay_pid*
+
+# ---- Node / Vite ----
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+
+# ---- Playwright ----
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- IDEs ----
+.idea/
+*.iml
+out/
+.classpath
+.project
+.settings/
+.factorypath
+.vscode/*
+!.vscode/extensions.json
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini
