@@ -2,6 +2,26 @@
 
 Newest entries first. Each entry gives the date, what was done (with task IDs), the evidence, and what's next.
 
+## 2026-11-23: Phase 2 started, first pass of business analysis (TASK-006 → IN_PROGRESS)
+
+**Owner answers** (multiple-choice, 2026-11-23):
+- B3a: both home delivery and in-store pickup.
+- B3b: the system picks the branch nearest the delivery address that has enough stock.
+- B2: each branch has its own stock, and recorded transfers between branches are allowed; no central warehouse.
+- B9: each branch has its own prices.
+
+The owner declined a second round of question dialogs and said to continue (TIẾP).
+
+**Done (business-analyst agent; checked by the orchestrator)**
+- Answers recorded in `open-questions.md`. REQ-004 → DRAFT. New REQ-013 to REQ-017, with draft acceptance criteria. REQ-017 is NEEDS_CONFIRMATION because it conflicts with automatic branch selection.
+- Drafted [online-order-fulfilment.md](../docs/business-analysis/processes/online-order-fulfilment.md), [stock-transfer.md](../docs/business-analysis/processes/stock-transfer.md) and [glossary.md](../docs/business-analysis/glossary.md). Every step is labelled CONFIRMED, INFERRED or NEEDS CONFIRMATION.
+- 11 follow-up questions raised: B3c, B3d, B3e, B9b and B11–B17, each citing the answer it comes from.
+- Orchestrator: `CLAUDE.md` §2 REQ-004 row updated; BLK-002 opened; DEC-016 (documentation work goes directly to `main`, as the owner instructed); `CLAUDE.md` §10 aligned with DEC-016.
+
+**Evidence:** `git status` shows the agent changed only `docs/requirements/` and `docs/business-analysis/`. The validation script found no problems (1 JSON, 40 Markdown, 58 links, 8 agents, 8 skills). No duplicate REQ or question IDs.
+
+**Next:** owner answers to the open questions (BLK-002). Most urgent are B11 (which price the storefront shows), B3c (pickup store), B4 (payment) and B5 (roles).
+
 ## 2026-11-23: Docker decision and merge to main (TASK-007 → DONE, TASK-008)
 
 - The owner instructed: finish the remaining setup, push to `main`, and don't install Docker ("TỰ LÀM ĐI PHẦN CÒN LẠI, CỨ PUSH LÊN MAIN NHÉ, KO CẦN CÀI DOCKER").

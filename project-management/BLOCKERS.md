@@ -7,6 +7,7 @@
 | ID | Blocker | Blocks | Owner | Raised | Status |
 |---|---|---|---|---|---|
 | BLK-001 | The JDK 21 install (winget) is waiting for Windows admin (UAC) approval. The Node.js LTS install is queued behind it. | TASK-003; Phases 7–9 locally | Project owner | 2026-11-23 11:39 | RESOLVED 2026-11-23 |
+| BLK-002 | Phase 2 needs owner answers: B1, B4–B8, B10, and the follow-up questions raised by the first answers (see [open-questions.md](../docs/requirements/open-questions.md)). | TASK-006 completion; Phase 3 gate | Project owner | 2026-11-23 | OPEN |
 
 ## BLK-001: resolution (2026-11-23)
 

@@ -24,7 +24,7 @@ These rules come from the project owner. Every design and every line of code mus
 | REQ-001 | One business can own multiple branches. | DRAFT |
 | REQ-002 | Inventory belongs to a specific branch. | DRAFT |
 | REQ-003 | The product catalog is managed centrally, unless approved requirements say otherwise. | DRAFT (default) |
-| REQ-004 | Product prices may vary by branch. | **NEEDS_CONFIRMATION** (B9): do not build pricing until confirmed |
+| REQ-004 | Product prices may vary by branch. | DRAFT: confirmed by the owner (B9, 2026-11-23), each branch has its own prices. Who sets them (B9b) and which price the storefront shows (B11) are open |
 | REQ-005 | Every order has a traceable processing branch. | DRAFT |
 | REQ-006 | Orders keep snapshots of product and price data at order time. | DRAFT |
 | REQ-007 | Available inventory must never become negative. | DRAFT |
@@ -33,6 +33,8 @@ These rules come from the project owner. Every design and every line of code mus
 | REQ-010 | The same payment is never processed twice. | DRAFT |
 | REQ-011 | The backend enforces branch-level authorization. | DRAFT |
 | REQ-012 | A `branchId` sent by the frontend is never trusted without an authorization check. | DRAFT |
+
+Requirements from the owner's Phase 2 answers (REQ-013 onwards: delivery and pickup, automatic branch selection, stock transfers, no central warehouse, branch prices on the storefront) are in the register.
 
 ### Handling unconfirmed information
 
@@ -133,9 +135,9 @@ Adding any other framework or library requires a new DEC entry and human approva
 
 ## 10. Git workflow
 
-- `main` holds only reviewed work. Name branches `feat/TASK-xxx-short-name`, `fix/BUG-xxx-short-name`, `docs/…` or `chore/…`.
+- **Documentation and planning work (Phases 2–6) goes directly to `main`**, as the owner instructed (DEC-016). Code work uses feature branches named `feat/TASK-xxx-short-name`, `fix/BUG-xxx-short-name`, `docs/…` or `chore/…`.
 - Commit messages follow Conventional Commits and include the ID, e.g. `feat(inventory): block negative stock (TASK-042)`.
-- Merge through a reviewed pull request. Branch protection is not decided yet (T8).
+- Code merges through a reviewed pull request. Branch protection is not decided yet (T8).
 - Never force-push `main`, rewrite published history, or commit secrets or build output.
 - Claude commits and pushes only when a human asks.
 

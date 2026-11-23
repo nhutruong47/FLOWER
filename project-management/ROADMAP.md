@@ -9,7 +9,7 @@ Each phase starts only after the previous phase's exit criteria are met **and** 
 |---|---|---|---|---|---|
 | 0. Workspace inspection | Understand what already exists | Inspection report | Orchestrator | Owner has reviewed the report | DONE |
 | 1. Project governance | Set up how the team works | `CLAUDE.md`, agents, skills, settings and hooks, `project-management/`, `docs/` structure | Orchestrator | Owner approves the scaffold; settings and hooks verified | DONE |
-| 2. Business analysis | Capture how the business actually works | Process descriptions, actors and roles, glossary; answers to B1–B10; draft REQ entries | business-analyst | Every open business question answered or explicitly deferred | NEXT (needs owner answers) |
+| 2. Business analysis | Capture how the business actually works | Process descriptions, actors and roles, glossary; answers to B1–B10; draft REQ entries | business-analyst | Every open business question answered or explicitly deferred | IN PROGRESS (first answers recorded 2026-11-23; BLK-002) |
 | 3. Requirements approval | Agree what will be built | Approved REQ list with acceptance criteria and priorities; MVP scope | business-analyst, owner | Owner signs off each in-scope REQ (status APPROVED) | PLANNED |
 | 4. Solution architecture | Decide how it will be built | Module map, context and container diagrams, API contract approach, confirmed conventions (DEC-010), ADRs | solution-architect, security-reviewer | ADRs accepted; every approved REQ assigned to a module | PLANNED |
 | 5. Database design | Design the data model | ERD, table specs, migration plan, constraints for REQ-002/005–008/010 | database-engineer | Model reviewed against the approved REQs; plan approved | PLANNED |

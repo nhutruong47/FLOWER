@@ -29,7 +29,7 @@ A blocked task keeps its status and references its BLK ID.
 | TASK-003 | Install local toolchain (JDK 21, Node.js LTS) | 1 | Orchestrator + owner | DONE | – |
 | TASK-004 | Project governance scaffold | 1 | Orchestrator | DONE | TASK-001 |
 | TASK-005 | Commit Phase 1 work and push the feature branch | 1 | Orchestrator | DONE | TASK-002, TASK-004, owner approval |
-| TASK-006 | Business analysis: answer B1–B10, draft processes and roles | 2 | business-analyst | PENDING | TASK-004 |
+| TASK-006 | Business analysis: answer B1–B10, draft processes and roles | 2 | business-analyst | IN_PROGRESS (BLK-002) | TASK-004 |
 | TASK-007 | Decide the local Docker strategy (T4) | 1–4 | Owner | DONE | – |
 | TASK-008 | Merge Phase 1 into `main` and push | 1 | Orchestrator | DONE | TASK-005, owner approval |
 
@@ -71,8 +71,10 @@ A blocked task keeps its status and references its BLK ID.
 
 ### TASK-006: Business analysis kickoff
 - **Acceptance criteria**
-  - [ ] B1–B10 answered by the owner or explicitly deferred.
-  - [ ] Draft process descriptions and a role list in `docs/business-analysis/`, each item labelled with its source.
+  - [ ] B1–B10 answered by the owner or explicitly deferred. **Progress:** B2, B3 and B9 answered on 2026-11-23. B1, B4–B8 and B10 are open, plus 11 follow-up questions (B3c–B3e, B9b, B11–B17) raised by the answers.
+  - [ ] Draft process descriptions and a role list in `docs/business-analysis/`, each item labelled with its source. **Progress:** [online-order-fulfilment.md](../docs/business-analysis/processes/online-order-fulfilment.md), [stock-transfer.md](../docs/business-analysis/processes/stock-transfer.md) and [glossary.md](../docs/business-analysis/glossary.md) drafted. Role list not started: it waits for B5.
+- **Notes (2026-11-23, first pass by the business-analyst):** REQ-004 moved from NEEDS_CONFIRMATION to DRAFT. Added REQ-013 to REQ-017, with draft acceptance criteria where the answers support them and "AC pending: Bx" elsewhere. REQ-017 (storefront shows the chosen branch's prices) is NEEDS_CONFIRMATION: it conflicts with automatic branch selection (B11). Orchestrator checks: changes limited to `docs/requirements/` and `docs/business-analysis/`; the validation script found no problems (40 Markdown files, 58 links); no duplicate REQ or question IDs. Waiting for answers: BLK-002.
+- **For later phases (from the analyst):** if B3d is answered "split the order across branches", REQ-005 needs clarifying. Walk-in shop sales affecting branch stock are a scope question to raise under B1.
 
 ### TASK-007: Decide the local Docker strategy
 - **Acceptance criteria**
