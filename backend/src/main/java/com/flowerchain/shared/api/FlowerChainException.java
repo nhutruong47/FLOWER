@@ -48,6 +48,6 @@ public class FlowerChainException extends RuntimeException {
     }
 
     public static FlowerChainException unprocessable(String errorCode, String title, String message) {
-        return new FlowerChainException(HttpStatus.UNPROCESSABLE_ENTITY, errorCode, title, message);
+        return new FlowerChainException(HttpStatus.UNPROCESSABLE_CONTENT, errorCode, title, message);
     }
 }

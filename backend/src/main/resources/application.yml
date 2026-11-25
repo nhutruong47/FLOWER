@@ -21,18 +21,28 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  jackson:
+    # Spring Boot 4 / Jackson 3: keep the Jackson 2 defaults Boot 3 used (missing primitives stay 0 or reach
+    # Bean Validation, trailing tokens are ignored) so API behaviour is unchanged by the upgrade (TASK-015).
+    use-jackson2-defaults: true
+  web:
+    error:
+      include-stacktrace: never
+      include-message: never
 
 server:
   port: ${SERVER_PORT:8080}
-  error:
-    include-stacktrace: never
-    include-message: never
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      # Boot 4 turns liveness/readiness probes on by default; keep Boot 3 behaviour until hosting (T6) is decided.
+      probes:
+        enabled: false
 
 flowerchain:
   security:

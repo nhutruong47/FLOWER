@@ -1,6 +1,5 @@
 package com.flowerchain.shared.internal;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flowerchain.shared.api.FlowerChainException;
 import com.flowerchain.shared.api.IdempotencyExecutor;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +13,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class IdempotencyService implements IdempotencyExecutor {
