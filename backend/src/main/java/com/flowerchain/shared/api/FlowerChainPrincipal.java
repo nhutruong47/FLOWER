@@ -33,6 +33,14 @@ public record FlowerChainPrincipal(
                 Set.of());
     }
 
+    /**
+     * The authenticated actor's ID, as recorded in audit trails and actor columns: the staff user
+     * ID for staff principals and the customer ID for customer principals. Alias of {@link #userId()}.
+     */
+    public UUID actorId() {
+        return userId;
+    }
+
     public boolean hasRole(String role) {
         return roles.contains(role);
     }

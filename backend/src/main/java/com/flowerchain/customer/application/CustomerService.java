@@ -101,9 +101,14 @@ public class CustomerService implements CustomerApi, TokenPrincipalResolver {
 
     @Override
     @Transactional(readOnly = true)
+    public CustomerDto getCustomerOrThrow(UUID customerId) {
+        return toDto(findCustomerOrThrow(customerId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CustomerDto getActiveCustomerOrThrow(UUID customerId) {
-        CustomerEntity customer = repository.findById(customerId)
-                .orElseThrow(() -> FlowerChainException.notFound("Customer " + customerId + " not found."));
+        CustomerEntity customer = findCustomerOrThrow(customerId);
         if (!"ACTIVE".equalsIgnoreCase(customer.getStatus())) {
             throw FlowerChainException.forbidden("AUTH_FORBIDDEN_ROLE", "Customer account is disabled.");
         }
@@ -123,6 +128,11 @@ public class CustomerService implements CustomerApi, TokenPrincipalResolver {
         return repository.findById(customerId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
                 .map(c -> FlowerChainPrincipal.customer(c.getId(), c.getEmail()));
+    }
+
+    private CustomerEntity findCustomerOrThrow(UUID customerId) {
+        return repository.findById(customerId)
+                .orElseThrow(() -> FlowerChainException.notFound("Customer " + customerId + " not found."));
     }
 
     private CustomerDto toDto(CustomerEntity e) {
