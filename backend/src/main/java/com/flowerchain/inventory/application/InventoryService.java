@@ -31,14 +31,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InventoryService implements InventoryApi {
-
-    private static final AtomicLong DOCUMENT_SEQUENCE = new AtomicLong(1000L);
 
     private final BranchInventoryRepository inventoryRepository;
     private final InventoryMovementRepository movementRepository;
@@ -159,10 +156,10 @@ public class InventoryService implements InventoryApi {
     @Override
     @Transactional(readOnly = true)
     public int getAvailableStock(UUID branchId, UUID productId) {
-        return inventoryRepository
-                .findByBranchIdAndProductId(branchId, productId)
-                .map(BranchInventoryEntity::getAvailableStock)
-                .orElse(0);
+        // Scalar read on purpose: placing an order checks availability and then locks the same row in one
+        // transaction. A managed entity loaded here would make the locked read fail a version check whenever a
+        // concurrent order committed in between, turning a clean 409 into a 500 (TASK-018, TEST-008).
+        return inventoryRepository.findAvailableStock(branchId, productId).orElse(0);
     }
 
     @Override
@@ -337,7 +334,7 @@ public class InventoryService implements InventoryApi {
         }
         Instant now = Instant.now(clock);
         UUID receiptId = UUID.randomUUID();
-        String receiptNumber = "GR-" + DOCUMENT_SEQUENCE.incrementAndGet();
+        String receiptNumber = "GR-" + goodsReceiptRepository.nextReceiptNumber();
         GoodsReceiptEntity receipt = goodsReceiptRepository.save(new GoodsReceiptEntity(
                 receiptId,
                 branchId,
@@ -475,7 +472,7 @@ public class InventoryService implements InventoryApi {
 
         Instant now = Instant.now(clock);
         UUID transferId = UUID.randomUUID();
-        String transferNumber = "TRF-" + DOCUMENT_SEQUENCE.incrementAndGet();
+        String transferNumber = "TRF-" + stockTransferRepository.nextTransferNumber();
         StockTransferEntity transfer = stockTransferRepository.save(new StockTransferEntity(
                 transferId,
                 transferNumber,

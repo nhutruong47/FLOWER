@@ -943,24 +943,43 @@ paths:
     get:
       tags: [Admin - Reports & Audit Logs]
       summary: Branch-scoped or chain-wide revenue and order summary calculated from order snapshots (FR-034, REQ-005, REQ-006, REQ-011)
+      description: |
+        Allowed roles: `SYSTEM_OWNER` and `HEAD_OFFICE_ADMIN` (all branches), `BRANCH_MANAGER` (own assigned branches only).
+        Other roles get `403`.
+
+        Branch scope comes from the authenticated user (REQ-011, REQ-012). Without `branchId`, Head Office sees every
+        active branch and a Branch Manager sees their assigned branches. A `branchId` outside the caller's scope is
+        rejected with `403 BRANCH_ACCESS_DENIED`, never silently ignored.
+
+        Counting rules (conservative reading of FR-034, pending owner confirmation):
+        - Only orders in status `COMPLETED` count, both for revenue and for every order count.
+        - An order belongs to the period when its `createdAt` lies in `[from, to)`.
+        - Each order is attributed to its processing branch (REQ-005).
+        - `grossRevenue` is the sum of the order-line snapshots (`lineTotalSnapshot`, REQ-006), never live catalog
+          prices. Delivery fees, discounts and refunds are not included.
+        - `branches` has one row per branch in scope, including branches with no orders, sorted by branch name.
+          `totalChainRevenue` and `totalChainOrders` are the totals over those rows.
       operationId: getRevenueReport
       security:
         - bearerAuth: []
       parameters:
         - name: branchId
           in: query
+          description: Optional filter; must be a branch the caller may access.
           schema:
             type: string
             format: uuid
         - name: from
           in: query
           required: true
+          description: Inclusive start of the period, ISO-8601 with `Z` or an offset; converted to UTC.
           schema:
             type: string
             format: date-time
         - name: to
           in: query
           required: true
+          description: Exclusive end of the period; must be later than `from`, otherwise `400 INVALID_DATE_RANGE`.
           schema:
             type: string
             format: date-time
@@ -971,6 +990,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevenueReportResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
         "403":
           $ref: "#/components/responses/ProblemForbidden"
 
@@ -1827,9 +1850,9 @@ components:
       properties:
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
-        currencyCode: { type: string }
-        totalChainRevenue: { type: string }
-        totalChainOrders: { type: integer }
+        currencyCode: { type: string, description: "Always VND for now." }
+        totalChainRevenue: { type: string, description: "Decimal string with 2 decimals; sum of grossRevenue over the branches in scope." }
+        totalChainOrders: { type: integer, description: "Sum of completedOrdersCount over the branches in scope." }
         branches:
           type: array
           items:
@@ -1839,9 +1862,9 @@ components:
               branchId: { type: string, format: uuid }
               branchName: { type: string }
               completedOrdersCount: { type: integer }
-              deliveryOrdersCount: { type: integer }
-              pickupOrdersCount: { type: integer }
-              grossRevenue: { type: string }
+              deliveryOrdersCount: { type: integer, description: "Completed DELIVERY orders." }
+              pickupOrdersCount: { type: integer, description: "Completed PICKUP orders." }
+              grossRevenue: { type: string, description: "Decimal string with 2 decimals; sum of order-line snapshots of completed orders." }
 
     AuditLogResponse:
       type: object

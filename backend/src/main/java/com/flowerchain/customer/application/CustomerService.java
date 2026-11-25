@@ -64,13 +64,16 @@ public class CustomerService implements CustomerApi, TokenPrincipalResolver {
         return new CustomerAuthResult(token, 3600, toDto(saved));
     }
 
-    @Transactional
+    // noRollbackFor: the failed-login audit entry is written before the 401 exception is thrown and must be
+    // committed, not rolled back with it. The failure path writes nothing else.
+    @Transactional(noRollbackFor = FlowerChainException.class)
     public CustomerAuthResult login(String email, String rawPassword) {
         String normalizedEmail = email.trim().toLowerCase();
         Optional<CustomerEntity> found = repository.findByEmailIgnoreCase(normalizedEmail);
-        if (found.isEmpty()
-                || !"ACTIVE".equalsIgnoreCase(found.get().getStatus())
-                || !passwordEncoder.matches(rawPassword, found.get().getPasswordHash())) {
+        String failureReason = loginFailureReason(found, rawPassword);
+        if (failureReason != null) {
+            // The submitted email and password are never written to the audit log (PII, TASK-018). A known
+            // account is identified by its ID; the reason code tells reviewers why the attempt failed.
             auditApi.record(new AuditEntryCommand(
                     "LOGIN",
                     "CUSTOMER_LOGIN_FAILURE",
@@ -80,7 +83,7 @@ public class CustomerService implements CustomerApi, TokenPrincipalResolver {
                     null,
                     "CUSTOMER",
                     null,
-                    "{\"email\":\"" + normalizedEmail + "\"}"));
+                    "{\"reason\":\"" + failureReason + "\"}"));
             throw FlowerChainException.unauthorized("AUTH_UNAUTHORIZED", "Invalid email or password.");
         }
         CustomerEntity customer = found.get();
@@ -128,6 +131,20 @@ public class CustomerService implements CustomerApi, TokenPrincipalResolver {
         return repository.findById(customerId)
                 .filter(c -> "ACTIVE".equalsIgnoreCase(c.getStatus()))
                 .map(c -> FlowerChainPrincipal.customer(c.getId(), c.getEmail()));
+    }
+
+    /** Audit reason code for a failed login, or {@code null} when the credentials are valid for an active account. */
+    private String loginFailureReason(Optional<CustomerEntity> found, String rawPassword) {
+        if (found.isEmpty()) {
+            return "UNKNOWN_ACCOUNT";
+        }
+        if (!"ACTIVE".equalsIgnoreCase(found.get().getStatus())) {
+            return "ACCOUNT_NOT_ACTIVE";
+        }
+        if (!passwordEncoder.matches(rawPassword, found.get().getPasswordHash())) {
+            return "INVALID_PASSWORD";
+        }
+        return null;
     }
 
     private CustomerEntity findCustomerOrThrow(UUID customerId) {

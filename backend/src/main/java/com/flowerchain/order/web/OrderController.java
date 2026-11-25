@@ -62,7 +62,7 @@ public class OrderController {
             UUID pickupBranchId,
             @DecimalMin("-90.0") @DecimalMax("90.0") Double deliveryLatitude,
             @DecimalMin("-180.0") @DecimalMax("180.0") Double deliveryLongitude,
-            @NotEmpty @Valid List<OrderItemRequest> items) {}
+            @NotEmpty List<@Valid OrderItemRequest> items) {}
 
     public record PlaceOrderRequest(
             @NotBlank @Pattern(regexp = "DELIVERY|PICKUP") String fulfilmentType,
@@ -78,7 +78,7 @@ public class OrderController {
             Instant requestedSlotStart,
             Instant requestedSlotEnd,
             @NotBlank String confirmedTotalAmount,
-            @NotEmpty @Valid List<OrderItemRequest> items) {}
+            @NotEmpty List<@Valid OrderItemRequest> items) {}
 
     public record CancelOrderRequest(@NotBlank @Size(min = 3, max = 500) String reason) {}
 

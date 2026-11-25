@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -38,8 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderService implements OrderApi {
 
-    private static final AtomicLong ORDER_SEQUENCE = new AtomicLong(2000L);
     private static final BigDecimal DEFAULT_DELIVERY_FEE = new BigDecimal("35000.00");
+    private static final int REPORT_LINE_LOOKUP_CHUNK = 1000;
 
     private final OrderRepository orderRepository;
     private final OrderLineRepository orderLineRepository;
@@ -166,7 +165,8 @@ public class OrderService implements OrderApi {
             Instant requestedSlotEnd,
             String confirmedTotalAmount,
             List<OrderItemInputDto> items) {
-        customerApi.getCustomerOrThrow(customerId);
+        // A disabled customer must not place orders, even with a token issued before the account was disabled.
+        customerApi.getActiveCustomerOrThrow(customerId);
         String normalizedFulfilment = fulfilmentType.trim().toUpperCase(Locale.ROOT);
         if ("DELIVERY".equals(normalizedFulfilment)) {
             if (deliveryStreetAddress == null || deliveryStreetAddress.isBlank()
@@ -236,7 +236,7 @@ public class OrderService implements OrderApi {
         Instant reservationExpiresAt = "PENDING_PAYMENT".equals(initialStatus)
                 ? now.plus(Duration.ofMinutes(15))
                 : null;
-        String orderNumber = "ORD-" + ORDER_SEQUENCE.incrementAndGet();
+        String orderNumber = "ORD-" + orderRepository.nextOrderNumber();
 
         OrderEntity savedOrder = orderRepository.save(new OrderEntity(
                 orderId,
@@ -662,13 +662,34 @@ public class OrderService implements OrderApi {
                 "{\"paymentStatus\":\"" + newPaymentStatus + "\",\"refundAmount\":\"" + refundedAmount.toPlainString() + "\"}"));
     }
 
+    /**
+     * Orders processed by one of {@code branchIds} and created in the half-open range {@code [from, to)}, with
+     * their persisted line snapshots (REQ-005, REQ-006). The half-open range lets adjacent report periods share
+     * a boundary without counting an order twice. Status filtering is left to the caller.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<OrderDetailDto> findOrdersForRevenueReport(Set<UUID> branchIds, Instant from, Instant to) {
-        return orderRepository.findAllByOrderByCreatedAtDesc().stream()
-                .filter(o -> branchIds.contains(o.getProcessingBranchId()))
-                .filter(o -> !o.getCreatedAt().isBefore(from) && !o.getCreatedAt().isAfter(to))
-                .map(o -> toDetailDto(o, orderLineRepository.findByOrderId(o.getId())))
+        if (branchIds == null || branchIds.isEmpty() || from == null || to == null || !from.isBefore(to)) {
+            return List.of();
+        }
+        List<OrderEntity> orders = orderRepository
+                .findByProcessingBranchIdInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                        branchIds, from, to);
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> orderIds = orders.stream().map(OrderEntity::getId).toList();
+        Map<UUID, List<OrderLineEntity>> linesByOrder = new LinkedHashMap<>();
+        // Chunked so a long report period never exceeds PostgreSQL's bind-parameter limit.
+        for (int start = 0; start < orderIds.size(); start += REPORT_LINE_LOOKUP_CHUNK) {
+            List<UUID> chunk = orderIds.subList(start, Math.min(start + REPORT_LINE_LOOKUP_CHUNK, orderIds.size()));
+            for (OrderLineEntity line : orderLineRepository.findByOrderIdIn(chunk)) {
+                linesByOrder.computeIfAbsent(line.getOrderId(), id -> new ArrayList<>()).add(line);
+            }
+        }
+        return orders.stream()
+                .map(o -> toDetailDto(o, linesByOrder.getOrDefault(o.getId(), List.of())))
                 .toList();
     }
 
