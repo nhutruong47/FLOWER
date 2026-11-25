@@ -1,13 +1,20 @@
 # Requirements register
 
-- **Status:** DRAFT. No requirement is approved yet.
-- **Last updated:** 2026-11-23
+- **Status:** DRAFT. No requirement is approved yet (awaiting owner sign-off at Phase 3 gate before P05).
+- **Last updated:** 2026-11-24
 - **Statuses:** `DRAFT` (captured, not yet approved) · `NEEDS_CONFIRMATION` (unclear or conditional, needs an owner decision) · `APPROVED` (signed off in Phase 3, may be built) · `REJECTED` · `SUPERSEDED` (link the replacement)
+- **Detailed P04 Requirement Specifications in this folder:**
+  - [functional-requirements.md](functional-requirements.md): Detailed Functional Requirements (`FR-001` to `FR-038`) with priority, source, preconditions, main/alternative/exception flows, testable acceptance criteria, dependencies, and linked business rules.
+  - [non-functional-requirements.md](non-functional-requirements.md): Measurable Non-Functional Requirements (`NFR-001` to `NFR-015`).
+  - [roles-and-permissions.md](roles-and-permissions.md): Role definitions (`SYSTEM_OWNER`, `HEAD_OFFICE_ADMIN`, `BRANCH_MANAGER`, `SALES_STAFF`, `INVENTORY_STAFF`, `DELIVERY_STAFF`, `CUSTOMER`), Role-Permission Matrix, and server-side branch data scope rules.
+  - [traceability-matrices.md](traceability-matrices.md): Requirement Traceability Matrix (`REQ` ↔ `BRULE` ↔ `FR`/`NFR` ↔ `UC` ↔ `WF` ↔ `TEST`), Use Case Matrix, Requirement Dependency Matrix, and Initial Test Case Mapping (`TEST-001` to `TEST-020`).
+  - [requirements-validation-report.md](requirements-validation-report.md): Duplicate, omission, contradiction, ambiguity, and unapproved-assumption audit.
+  - [open-questions.md](open-questions.md): Living register of business (`B1–B22`) and technical (`T1–T12`) questions.
 - **Rules:**
   - Only `APPROVED` requirements may be built as features.
   - Every requirement states its source. Never add a requirement based on an assumption; add a question to [open-questions.md](open-questions.md) instead.
   - Acceptance criteria are drafted in Phase 2 (see [Draft acceptance criteria](#draft-acceptance-criteria)), finalised in Phase 3, and verified by TEST cases in [TEST_CASES.md](../testing/TEST_CASES.md).
-- **About REQ-001 to REQ-012:** these are guardrails from the project owner (Phase 1 brief, 2026-11-23). Every design must respect them, even before Phase 3 formally approves them.
+- **About REQ-001 to REQ-012 (Baseline Business Rules `BRULE-001` to `BRULE-012`):** these are guardrails from the project owner (Phase 1 brief, 2026-11-23). Each baseline `REQ-001..012` corresponds 1:1 to `BRULE-001..012`. Every design must respect them, even before Phase 3 formally approves them.
 
 | ID | Requirement | Type | Source | Status | Notes / related questions |
 |---|---|---|---|---|---|

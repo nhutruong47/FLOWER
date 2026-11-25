@@ -52,6 +52,7 @@ Requirements from the owner's Phase 2 answers (REQ-013 onwards: delivery and pic
 | Frontend | React, TypeScript, Vite, Tailwind CSS; two apps (storefront, admin) plus a shared package in an npm workspace | DEC-005 |
 | Testing | JUnit 5, Mockito, Testcontainers, Playwright | DEC-006 |
 | Infrastructure | Docker, GitHub Actions | DEC-007 |
+| Optional / unresolved stack choices | Redis (caching/locks where justified), RabbitMQ (async messaging where justified), Spring Modulith vs. ArchUnit (T9), Auth mechanism (T5), Hosting target (T6), PostgreSQL version (T10), Frontend unit-test runner (T11) | NEEDS CONFIRMATION (confirm in Phase 4) |
 
 Adding any other framework or library requires a new DEC entry and human approval.
 
@@ -164,9 +165,22 @@ Adding any other framework or library requires a new DEC entry and human approva
 - Add no dependencies without approval. Build no business features before the related REQ is approved (Phase 3).
 - Never connect to production systems or deploy without explicit human approval.
 
-## 13. IDs, statuses and team
+## 13. IDs, statuses, approval policies and team
 
-- **IDs:** REQ-001, DEC-001, TASK-001, BUG-001, TEST-001, and BLK-001 for blockers. IDs are never reused.
-- **Task statuses:** `PENDING → IN_PROGRESS → IMPLEMENTED → TESTING → FIXING → CODE_REVIEW → DONE`. FIXING applies only when testing or review finds a defect; afterwards the task returns to TESTING. If testing finds no defect, the task goes straight from TESTING to CODE_REVIEW. **A task becomes DONE only after every acceptance criterion has been verified, with the evidence recorded.**
+- **IDs:**
+  - `REQ-001`: Requirement
+  - `BRULE-001`: Business Rule (Note: baseline rules `REQ-001` to `REQ-012` also serve as the foundational business rules `BRULE-001` to `BRULE-012`)
+  - `DEC-001`: Decision
+  - `ADR-001` / `ADR-0001`: Architecture Decision Record
+  - `TASK-001`: Task
+  - `BUG-001`: Bug
+  - `TEST-001`: Test Case
+  - `BLK-001`: Blocker
+  - IDs are never reused.
+- **Task statuses:** `PENDING → IN_PROGRESS → IMPLEMENTED → TESTING → FIXING → CODE_REVIEW → DONE` (plus `BLOCKED` referencing a `BLK-xxx` ID, or `NEEDS_APPROVAL` when waiting at an owner gate). FIXING applies only when testing or review finds a defect; afterwards the task returns to TESTING. If testing finds no defect, the task goes straight from TESTING to CODE_REVIEW. **A task becomes DONE only after every acceptance criterion has been verified, with the evidence recorded.**
+- **Task definition requirements:** Every task in `TASKS.md` must specify: Task ID, Objective, Scope, Dependencies, Files affected, Acceptance Criteria, and Test Cases (or verification method for doc-only tasks).
+- **Approval and escalation policies:**
+  - Stop and ask for explicit human approval before: crossing a phase gate, approving requirements (`REQ-xxx` → `APPROVED`), accepting major architecture or dependency decisions (`DEC-xxx` → `ACCEPTED`), running destructive commands or risky migrations, pushing/merging to remote branches, or touching any staging/production environment.
+  - Escalate immediately if requirements conflict, if a baseline business rule (`REQ-001` to `REQ-012`) cannot be satisfied, or if information is missing (`open-questions.md`, `BLOCKERS.md`).
 - **Agents** (`.claude/agents/`): business-analyst, solution-architect, backend-developer, frontend-developer, database-engineer, qa-engineer, security-reviewer (read-only) and devops-engineer.
-- **Skills** (`.claude/skills/`): `project-orchestration` coordinates the agents and enforces task dependencies. The others are business-analysis, architecture-design, backend-development, frontend-development, database-design, testing and deployment.
+- **Skills** (`.claude/skills/`): `project-orchestration` coordinates the agents and enforces task dependencies. The others are `business-analysis`, `requirements-engineering`, `architecture-design`, `backend-development`, `frontend-development`, `database-design`, `testing` and `deployment`.

@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Write, Edit
 model: inherit
 skills:
   - business-analysis
+  - requirements-engineering
 ---
 
 # Business Analyst

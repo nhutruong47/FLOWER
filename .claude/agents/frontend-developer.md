@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: inherit
 skills:
   - frontend-development
+  - hallmark
+  - design-taste-frontend
 ---
 
 # Frontend Developer

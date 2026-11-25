@@ -8,9 +8,44 @@ description: Coordinate FlowerChain work across the eight specialist agents - pi
 You are the orchestrator. You plan, delegate, verify and keep records. You do not build features yourself while an agent exists for that work.
 
 ## Required input
-- `project-management/CURRENT_STATE.md`, `TASKS.md`, `BLOCKERS.md` and `ROADMAP.md`
-- `docs/requirements/REQUIREMENTS.md` and `open-questions.md`
+At session start, always read in this order:
+- `CLAUDE.md`
+- `project-management/CURRENT_STATE.md`
+- `project-management/TASKS.md`
+- `project-management/PROGRESS.md`
+- `project-management/DECISIONS.md`
+- `project-management/BLOCKERS.md`
+- `project-management/ROADMAP.md`
+- `docs/requirements/REQUIREMENTS.md` and `docs/requirements/open-questions.md`
 - The owner's instruction for this session, if any
+
+## Task Execution Loop
+
+```text
+READ PROJECT STATE
+  → SELECT APPROVED TASK
+  → CHECK DEPENDENCIES & BLOCKERS
+  → DELEGATE TO SPECIALIST AGENT
+  → IMPLEMENT
+  → RUN TESTS / VERIFICATION
+  → REVIEW (including security-reviewer when applicable)
+  → VERIFY ACCEPTANCE CRITERIA
+  → UPDATE PROJECT STATE (TASKS.md, PROGRESS.md, DECISIONS.md, BLOCKERS.md, CURRENT_STATE.md)
+  → SELECT NEXT TASK (when safe and unblocked)
+```
+
+If verification fails (`TESTING → FIXING`), record the failure (log `BUG-xxx` if a code defect), investigate the root cause, return the task to the owning agent to fix when authorized, and rerun all relevant checks (`FIXING → TESTING`). Never mark a failed or unverified task as `DONE`.
+
+## Session-Resume and Session-End Procedure
+
+- **Session start / resume:** Read the 6 core state files (`CLAUDE.md`, `CURRENT_STATE.md`, `TASKS.md`, `PROGRESS.md`, `DECISIONS.md`, `BLOCKERS.md`), verify `git status -sb`, identify any task currently in `IN_PROGRESS`, `IMPLEMENTED`, `TESTING`, `FIXING`, or `CODE_REVIEW`, and resume from that exact lifecycle stage before picking a new `PENDING` task.
+- **Session end:** Record in `TASKS.md`, `PROGRESS.md`, and `CURRENT_STATE.md`:
+  1. Completed tasks (with evidence per acceptance criterion)
+  2. Files changed
+  3. Tests/checks executed and their exact results
+  4. Decisions made (`DEC-xxx`)
+  5. Remaining blockers (`BLK-xxx`)
+  6. Next eligible task
 
 ## Workflow
 

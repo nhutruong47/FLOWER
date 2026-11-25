@@ -2,7 +2,7 @@
 
 **FlowerChain**: a management and e-commerce platform for a business that runs multiple flower shop branches (initial target: 5–30 branches). It covers the customer-facing online shop and the internal system used by head office and branch staff.
 
-> **Status:** Phase 1, project governance (awaiting owner approval). There is no application code yet. Live status: [project-management/CURRENT_STATE.md](project-management/CURRENT_STATE.md).
+> **Status:** Phase 1 governance complete (`DONE`); Phase 2 business analysis in progress (`IN_PROGRESS`). There is no application code yet. Live status: [project-management/CURRENT_STATE.md](project-management/CURRENT_STATE.md).
 
 ## Planned stack
 

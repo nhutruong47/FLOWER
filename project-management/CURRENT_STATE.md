@@ -1,19 +1,19 @@
 # Current state
 
-- **Last updated:** 2026-11-23
+- **Last updated:** 2026-11-24
 - **Read this first** at the start of every session, then follow the `project-orchestration` skill.
 
 ## Where we are
 
 | Item | State |
 |---|---|
-| Phase | **2, Business analysis: IN PROGRESS** (TASK-006 first pass done 2026-11-23). Waiting for owner answers (BLK-002). |
-| Git | All Phase 1 work is on **`main`** at GitHub (fast-forward merge, TASK-008 DONE). Work continues on `main`, as the owner instructed. `chore/phase-1-foundation` is kept for reference. |
-| Application code | None. No business features exist. None may be built before Phase 3 approval. |
-| Requirements | REQ-001 to REQ-017. 16 are DRAFT; REQ-017 (storefront shows branch prices) is NEEDS_CONFIRMATION. None APPROVED. |
-| Open questions | Answered: B2, B3, B9 (partly). Open business questions: B1, B4–B8, B10, and follow-ups B3c–B3e, B9b, B11–B17. Technical: T5–T12 |
-| Local toolchain | Git ✓ · JDK 21.0.13.1 Temurin ✓ · Node.js v26.13.1 / npm 11.20.0 ✓ (portable, DEC-014) · **Docker: not used locally (DEC-015)**; integration tests run in GitHub Actions. **Note:** an IDE or Claude session opened before the PATH change (2026-11-23 ~14:05) can't see `java` or `node`. Restart the IDE before any build task. |
-| Claude Code | 2.1.330. Project settings: conservative permissions, `protect-secrets` hook active and verified |
+| Phase | **Phase 1 Governance: DONE** · **P02 Orchestrator: DONE (TASK-009)** · **Phases 2–6 (P03 Business Analysis, P04 Requirements, P05 Architecture, P06 Database & API, P07 UI/UX Design): DELIVERABLES COMPLETE, AWAITING OWNER APPROVAL (TASK-006, TASK-010, TASK-011, TASK-012, TASK-013)** |
+| Git | Working tree on **`main`** contains P01 through P07 documentation deliverables and installed `hallmark` + `design-taste-frontend` skills locally (not pushed; pushes require explicit owner approval). |
+| Application code | None. All planning and design phases (Phases 0–6 / P00–P07) are complete and ready for Phase 7–8 implementation once approved. |
+| Requirements, Architecture, DB, API & UI/UX | `REQ-001`..`017`, `BRULE-001`..`030`, `FR-001`..`038`, `NFR-001`..`015`, `TEST-001`..`020`, `L0`–`L7` Module Map, `ADR-0002`..`0010`, 24-table PostgreSQL 16 ERD & Data Dictionary, 8-step Flyway Migration Plan, OpenAPI 3.1 Contract (`docs/api/openapi.yaml`), and Hallmark/Taste-Skill UI/UX Design (`docs/ui-ux/`, `UI-AC-01`..`11`) complete. |
+| Open questions | Technical questions `T5`, `T9`, `T10`, `T11`, `T12` have concrete proposed ADR resolutions (`ADR-0002`..`0010`). Hosting provider (`T6`) and business confirmations remain open for owner sign-off. |
+| Local toolchain | Git ✓ · JDK 21 ✓ · Node.js LTS / npm ✓ · **Docker:** CI-only integration tests per DEC-015 (though Docker CLI 29.5.3 was also detected on the current machine during P00 audit). |
+| Claude Code | Project settings: conservative permissions, 8 specialist agents, 9 skills (added `requirements-engineering`), `protect-secrets` hook active and verified (27/27 tests pass). |
 
 ## Open blockers
 

@@ -1,0 +1,27 @@
+name: Backend CI (Build, Modulith & PostgreSQL 16 Testcontainers)
+
+on:
+  push:
+    branches: [ main, "feat/**", "fix/**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Run Unit, Service, Security, Modulith & Testcontainers Integration Tests
+        run: ./mvnw verify -B

@@ -1,0 +1,1873 @@
+openapi: 3.1.0
+info:
+  title: FlowerChain Multi-Branch E-Commerce and Management API
+  version: 1.0.0
+  description: |
+    REST API contract for FlowerChain (Java 21 / Spring Boot 3.4 Modular Monolith).
+    - Separate route groups for Customer Storefront (`/api/v1/storefront/**`), Internal Admin (`/api/v1/admin/**`), and Server-to-Server Payment Webhooks (`/api/v1/webhooks/payments/**`).
+    - All error responses use RFC 9457 Problem Details (`application/problem+json`).
+    - Branch-level authorization (`REQ-011`, `REQ-012`) is enforced server-side on every branch-owned resource.
+servers:
+  - url: /api/v1
+    description: API v1 base path
+
+tags:
+  - name: Storefront - Branches & Catalog
+  - name: Storefront - Auth & Customer Profile
+  - name: Storefront - Orders & Checkout
+  - name: Webhooks - Payments
+  - name: Admin - Authentication
+  - name: Admin - Branches & Settings
+  - name: Admin - Staff & Roles
+  - name: Admin - Catalog & Branch Prices
+  - name: Admin - Branch Inventory & Operations
+  - name: Admin - Stock Transfers
+  - name: Admin - Orders & Fulfilment
+  - name: Admin - Payments & Refunds
+  - name: Admin - Reports & Audit Logs
+
+paths:
+  # ============================================================================
+  # STOREFRONT ROUTE GROUP (/api/v1/storefront/**)
+  # ============================================================================
+  /storefront/branches:
+    get:
+      tags: [Storefront - Branches & Catalog]
+      summary: List active public branches (FR-009, REQ-001)
+      operationId: listPublicBranches
+      security: []
+      responses:
+        "200":
+          description: Active branches available for browsing, delivery coverage, or in-store pickup
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicBranchResponse"
+
+  /storefront/categories:
+    get:
+      tags: [Storefront - Branches & Catalog]
+      summary: List active product categories (FR-010, REQ-003)
+      operationId: listPublicCategories
+      security: []
+      responses:
+        "200":
+          description: Active product categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryResponse"
+
+  /storefront/branches/{branchId}/products:
+    get:
+      tags: [Storefront - Branches & Catalog]
+      summary: List catalog products with the chosen branch's prices and stock availability (FR-014, REQ-004, REQ-017)
+      operationId: listBranchCatalogProducts
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated products with branch-specific unit prices and availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorefrontProductPageResponse"
+        "404":
+          $ref: "#/components/responses/ProblemNotFound"
+
+  /storefront/auth/register:
+    post:
+      tags: [Storefront - Auth & Customer Profile]
+      summary: Register a customer account (FR-002, FR-003)
+      operationId: registerCustomer
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRegisterRequest"
+      responses:
+        "201":
+          description: Customer registered and authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerAuthResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /storefront/auth/login:
+    post:
+      tags: [Storefront - Auth & Customer Profile]
+      summary: Authenticate a customer (FR-002)
+      operationId: loginCustomer
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated customer session/token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerAuthResponse"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+
+  /storefront/customers/me:
+    get:
+      tags: [Storefront - Auth & Customer Profile]
+      summary: Get authenticated customer's own profile and saved addresses (FR-031, BRULE-027)
+      operationId: getMyCustomerProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Customer profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerProfileResponse"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+
+  /storefront/orders/quote:
+    post:
+      tags: [Storefront - Orders & Checkout]
+      summary: Calculate checkout quote, resolve processing branch, and flag any branch price difference (FR-014, FR-021, REQ-014, REQ-017)
+      operationId: quoteStorefrontOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderQuoteRequest"
+      responses:
+        "200":
+          description: Resolved processing branch, branch-specific line prices, delivery fee, and total
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderQuoteResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+        "422":
+          $ref: "#/components/responses/ProblemUnprocessableEntity"
+
+  /storefront/orders:
+    post:
+      tags: [Storefront - Orders & Checkout]
+      summary: Place an online delivery or pickup order with automatic branch allocation, stock reservation, and price snapshots (FR-021, REQ-005..008, REQ-012..014)
+      operationId: placeStorefrontOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrderRequest"
+      responses:
+        "201":
+          description: Order created with processing branch, snapshotted lines, and reserved stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+        "422":
+          $ref: "#/components/responses/ProblemUnprocessableEntity"
+    get:
+      tags: [Storefront - Orders & Checkout]
+      summary: List authenticated customer's own orders (FR-002, FR-031, BRULE-027)
+      operationId: listMyOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated orders owned by the authenticated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSummaryPageResponse"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+
+  /storefront/orders/{orderId}:
+    get:
+      tags: [Storefront - Orders & Checkout]
+      summary: Get customer's own order details with immutable product/price snapshots (FR-002, REQ-006, BRULE-027)
+      operationId: getMyOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      responses:
+        "200":
+          description: Order details (returns 404 if order belongs to another customer)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+        "404":
+          $ref: "#/components/responses/ProblemNotFound"
+
+  /storefront/orders/{orderId}/cancel:
+    post:
+      tags: [Storefront - Orders & Checkout]
+      summary: Cancel own order prior to preparation cutoff and release reserved stock (FR-024, REQ-008)
+      operationId: cancelMyOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelOrderRequest"
+      responses:
+        "200":
+          description: Order cancelled and reserved stock restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "404":
+          $ref: "#/components/responses/ProblemNotFound"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  # ============================================================================
+  # PAYMENT WEBHOOK ROUTE GROUP (/api/v1/webhooks/payments/**)
+  # ============================================================================
+  /webhooks/payments/{provider}:
+    post:
+      tags: [Webhooks - Payments]
+      summary: Receive and verify server-to-server payment provider webhook idempotently (FR-025, FR-026, REQ-009, REQ-010)
+      operationId: receivePaymentWebhook
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [sandbox-hmac, vnpay, momo]
+        - name: X-Payment-Signature
+          in: header
+          required: true
+          description: Cryptographic HMAC-SHA256 signature computed over raw request body (REQ-009)
+          schema:
+            type: string
+        - name: X-Payment-Timestamp
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentWebhookPayload"
+      responses:
+        "200":
+          description: Webhook verified and processed (or idempotently acknowledged if already processed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAckResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+
+  # ============================================================================
+  # ADMIN ROUTE GROUP (/api/v1/admin/**)
+  # ============================================================================
+  /admin/auth/login:
+    post:
+      tags: [Admin - Authentication]
+      summary: Staff login returning access token and server-resolved role & branch scope (FR-001, REQ-011)
+      operationId: loginStaff
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated staff principal with roles and authorizedBranchIds
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAuthResponse"
+        "401":
+          $ref: "#/components/responses/ProblemUnauthorized"
+
+  /admin/auth/logout:
+    post:
+      tags: [Admin - Authentication]
+      summary: Revoke current staff refresh session (FR-001)
+      operationId: logoutStaff
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Session revoked
+
+  /admin/branches:
+    get:
+      tags: [Admin - Branches & Settings]
+      summary: List branches visible to the authenticated staff member (FR-007, REQ-001, REQ-011)
+      operationId: listAdminBranches
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Branches list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminBranchResponse"
+    post:
+      tags: [Admin - Branches & Settings]
+      summary: Create a new branch (SYSTEM_OWNER / HEAD_OFFICE_ADMIN only - FR-007, FR-008)
+      operationId: createBranch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertBranchRequest"
+      responses:
+        "201":
+          description: Branch created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBranchResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/branches/{branchId}:
+    put:
+      tags: [Admin - Branches & Settings]
+      summary: Update branch details, coordinates, delivery radius, or status (FR-007, FR-008)
+      operationId: updateBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertBranchRequest"
+      responses:
+        "200":
+          description: Branch updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminBranchResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "404":
+          $ref: "#/components/responses/ProblemNotFound"
+
+  /admin/staff:
+    get:
+      tags: [Admin - Staff & Roles]
+      summary: List staff accounts (FR-004, FR-005)
+      operationId: listStaff
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated staff list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+    post:
+      tags: [Admin - Staff & Roles]
+      summary: Create a staff user with role(s) and authorized branch assignments (FR-004, FR-005, REQ-011)
+      operationId: createStaff
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffRequest"
+      responses:
+        "201":
+          description: Staff account created and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffUserResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/staff/{staffId}/assignments:
+    put:
+      tags: [Admin - Staff & Roles]
+      summary: Update staff user's roles, active status, and authorized branchIds (FR-004, FR-005, BRULE-030)
+      operationId: updateStaffAssignments
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: staffId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStaffAssignmentsRequest"
+      responses:
+        "200":
+          description: Assignments updated and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffUserResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/products:
+    get:
+      tags: [Admin - Catalog & Branch Prices]
+      summary: List central catalog products (FR-010, REQ-003)
+      operationId: listAdminProducts
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated central catalog products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProductPageResponse"
+    post:
+      tags: [Admin - Catalog & Branch Prices]
+      summary: Create a central catalog product SKU (HEAD_OFFICE_ADMIN / SYSTEM_OWNER only - FR-010, REQ-003)
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertProductRequest"
+      responses:
+        "201":
+          description: Central product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminProductResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/branches/{branchId}/prices/{productId}:
+    put:
+      tags: [Admin - Catalog & Branch Prices]
+      summary: Set or update a product's unit price at a specific branch and record price audit log (FR-013, REQ-004, REQ-011, REQ-012)
+      operationId: upsertBranchProductPrice
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+        - $ref: "#/components/parameters/ProductIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertBranchPriceRequest"
+      responses:
+        "200":
+          description: Branch product price saved and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchPriceResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/branches/{branchId}/inventory:
+    get:
+      tags: [Admin - Branch Inventory & Operations]
+      summary: List branch stock levels (branch-scoped via BranchAuthorizationGuard - FR-015, REQ-002, REQ-011, REQ-012)
+      operationId: listBranchInventory
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated branch inventory balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BranchInventoryPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/branches/{branchId}/inventory/movements:
+    get:
+      tags: [Admin - Branch Inventory & Operations]
+      summary: Query immutable inventory audit ledger for a branch (FR-016, REQ-008, REQ-011)
+      operationId: listBranchInventoryMovements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+        - name: productId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: reasonCode
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated inventory audit records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryMovementPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/branches/{branchId}/goods-receipts:
+    post:
+      tags: [Admin - Branch Inventory & Operations]
+      summary: Record a Goods Receipt (stock-in) at a branch and write +qty audit movements (FR-020, REQ-002, REQ-008, REQ-011, REQ-016)
+      operationId: createGoodsReceipt
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoodsReceiptRequest"
+      responses:
+        "201":
+          description: Goods receipt recorded and branch stock incremented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoodsReceiptResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/branches/{branchId}/stock-adjustments:
+    post:
+      tags: [Admin - Branch Inventory & Operations]
+      summary: Record spoilage, damaged flowers, or stocktake adjustment (never allowing stock < 0 - FR-019, REQ-007, REQ-008, REQ-011)
+      operationId: createStockAdjustment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/BranchIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStockAdjustmentRequest"
+      responses:
+        "201":
+          description: Adjustment recorded and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockAdjustmentResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/stock-transfers:
+    get:
+      tags: [Admin - Stock Transfers]
+      summary: List inter-branch stock transfers filtered by caller's authorized branches (FR-018, REQ-011, REQ-015)
+      operationId: listStockTransfers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated stock transfers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockTransferPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+    post:
+      tags: [Admin - Stock Transfers]
+      summary: Create an inter-branch stock transfer request (FR-018, REQ-015)
+      operationId: createStockTransfer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStockTransferRequest"
+      responses:
+        "201":
+          description: Stock transfer requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockTransferResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/stock-transfers/{transferId}/dispatch:
+    post:
+      tags: [Admin - Stock Transfers]
+      summary: Dispatch transfer from sourceBranchId (deducts -qty with row lock & TRANSFER_OUT audit - FR-018, REQ-007, REQ-008, REQ-011, REQ-015)
+      operationId: dispatchStockTransfer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TransferIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DispatchStockTransferRequest"
+      responses:
+        "200":
+          description: Stock deducted from sending branch and transfer marked IN_TRANSIT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockTransferResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/stock-transfers/{transferId}/receive:
+    post:
+      tags: [Admin - Stock Transfers]
+      summary: Confirm receipt at targetBranchId (adds +qty with TRANSFER_IN audit - FR-018, REQ-008, REQ-011, REQ-015)
+      operationId: receiveStockTransfer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TransferIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiveStockTransferRequest"
+      responses:
+        "200":
+          description: Stock added to receiving branch and transfer marked COMPLETED
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockTransferResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/orders:
+    get:
+      tags: [Admin - Orders & Fulfilment]
+      summary: List orders filtered by authenticated user's authorized branches (FR-022, REQ-005, REQ-011, REQ-012)
+      operationId: listAdminOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: fulfilmentType
+          in: query
+          schema:
+            type: string
+            enum: [DELIVERY, PICKUP]
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated branch-scoped orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSummaryPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/orders/{orderId}:
+    get:
+      tags: [Admin - Orders & Fulfilment]
+      summary: Get branch order details and snapshotted lines (FR-022, REQ-005, REQ-006, REQ-011)
+      operationId: getAdminOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "404":
+          $ref: "#/components/responses/ProblemNotFound"
+
+  /admin/orders/{orderId}/status:
+    post:
+      tags: [Admin - Orders & Fulfilment]
+      summary: Transition order fulfilment status at the processing branch and record audit entry (FR-022, FR-028, FR-029, REQ-011, BRULE-023)
+      operationId: transitionOrderStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionOrderStatusRequest"
+      responses:
+        "200":
+          description: Status updated and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/orders/{orderId}/reassign-branch:
+    post:
+      tags: [Admin - Orders & Fulfilment]
+      summary: Reassign order processing branch before preparation, moving reserved stock and preserving snapshots (FR-023, REQ-005..008)
+      operationId: reassignOrderBranch
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrderIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReassignOrderBranchRequest"
+      responses:
+        "200":
+          description: Order processing branch reassigned and stock movements audited at both branches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetailResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/payments/{paymentId}/refunds:
+    post:
+      tags: [Admin - Payments & Refunds]
+      summary: Record/process an authorized payment refund and write refund audit entry (FR-027, BRULE-025)
+      operationId: createPaymentRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/IdempotencyKeyHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRefundRequest"
+      responses:
+        "201":
+          description: Refund recorded and audited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefundResponse"
+        "400":
+          $ref: "#/components/responses/ProblemBadRequest"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+        "409":
+          $ref: "#/components/responses/ProblemConflict"
+
+  /admin/reports/revenue:
+    get:
+      tags: [Admin - Reports & Audit Logs]
+      summary: Branch-scoped or chain-wide revenue and order summary calculated from order snapshots (FR-034, REQ-005, REQ-006, REQ-011)
+      operationId: getRevenueReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Revenue and order summary by branch
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevenueReportResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+  /admin/audit-logs:
+    get:
+      tags: [Admin - Reports & Audit Logs]
+      summary: Query immutable security, price, order-status, and refund audit logs (FR-036, CLAUDE.md §8)
+      operationId: listAuditLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: branchId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [LOGIN, ROLE_CHANGE, PRICE_CHANGE, ORDER_STATUS, REFUND, SETTING]
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/SizeParam"
+      responses:
+        "200":
+          description: Paginated audit log records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogPageResponse"
+        "403":
+          $ref: "#/components/responses/ProblemForbidden"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    BranchIdPath:
+      name: branchId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ProductIdPath:
+      name: productId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    OrderIdPath:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TransferIdPath:
+      name: transferId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Client-generated UUID for safe retry deduplication (CLAUDE.md §7, NFR-004)
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    ProblemBadRequest:
+      description: Invalid input or validation error (RFC 9457 Problem Details)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ProblemUnauthorized:
+      description: Unauthenticated or invalid webhook signature
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ProblemForbidden:
+      description: Forbidden by role or branch-level authorization (REQ-011, REQ-012)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ProblemNotFound:
+      description: Resource not found (or hidden to prevent cross-actor data leakage)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ProblemConflict:
+      description: Business state conflict (insufficient stock REQ-007, invalid status transition, duplicate resource)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    ProblemUnprocessableEntity:
+      description: Semantic business rule rejection (e.g. delivery address outside all branch delivery zones)
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+
+  schemas:
+    ProblemDetail:
+      type: object
+      required: [type, title, status, detail, timestamp]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: "https://flowerchain.com/problems/insufficient-stock"
+        title:
+          type: string
+          example: "Insufficient branch inventory"
+        status:
+          type: integer
+          example: 409
+        detail:
+          type: string
+          example: "No active branch covering the delivery address holds sufficient available stock for the requested items."
+        instance:
+          type: string
+          example: "/api/v1/storefront/orders"
+        errorCode:
+          type: string
+          example: "INVENTORY_INSUFFICIENT_STOCK"
+        requestId:
+          type: string
+          example: "req_01JDF8P2M4K6"
+        timestamp:
+          type: string
+          format: date-time
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+
+    PublicBranchResponse:
+      type: object
+      required: [id, code, name, streetAddress, district, city, phone, latitude, longitude, operatingHours]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        streetAddress: { type: string }
+        district: { type: string }
+        city: { type: string }
+        phone: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        operatingHours: { type: string }
+
+    AdminBranchResponse:
+      allOf:
+        - $ref: "#/components/schemas/PublicBranchResponse"
+        - type: object
+          required: [maxDeliveryRadiusKm, status, createdAt, updatedAt]
+          properties:
+            maxDeliveryRadiusKm: { type: number }
+            status: { type: string, enum: [ACTIVE, INACTIVE] }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+
+    UpsertBranchRequest:
+      type: object
+      required: [code, name, streetAddress, district, city, phone, latitude, longitude, maxDeliveryRadiusKm, operatingHours, status]
+      properties:
+        code: { type: string, minLength: 2, maxLength: 32 }
+        name: { type: string, minLength: 2, maxLength: 150 }
+        streetAddress: { type: string, maxLength: 255 }
+        district: { type: string, maxLength: 100 }
+        city: { type: string, maxLength: 100 }
+        phone: { type: string, maxLength: 32 }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        maxDeliveryRadiusKm: { type: number, exclusiveMinimum: 0 }
+        operatingHours: { type: string, maxLength: 128 }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+
+    CategoryResponse:
+      type: object
+      required: [id, slug, name, displayOrder, status]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        name: { type: string }
+        description: { type: string }
+        displayOrder: { type: integer }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+
+    StorefrontProductResponse:
+      type: object
+      required: [productId, sku, name, categoryId, branchId, unitPrice, currencyCode, availableStock, inStock]
+      properties:
+        productId: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        imageUrl: { type: string }
+        unitLabel: { type: string }
+        categoryId: { type: string, format: uuid }
+        branchId: { type: string, format: uuid }
+        unitPrice: { type: string, description: "Decimal string representation of BigDecimal (e.g. '500000.00')" }
+        currencyCode: { type: string, example: "VND" }
+        availableStock: { type: integer, minimum: 0 }
+        inStock: { type: boolean }
+
+    StorefrontProductPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorefrontProductResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+
+    CustomerRegisterRequest:
+      type: object
+      required: [email, password, fullName, phone]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        fullName: { type: string, minLength: 2, maxLength: 150 }
+        phone: { type: string, minLength: 8, maxLength: 32 }
+
+    CustomerAuthResponse:
+      type: object
+      required: [accessToken, expiresInSeconds, customer]
+      properties:
+        accessToken: { type: string }
+        expiresInSeconds: { type: integer }
+        customer:
+          $ref: "#/components/schemas/CustomerProfileResponse"
+
+    CustomerProfileResponse:
+      type: object
+      required: [id, email, fullName, phone]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        fullName: { type: string }
+        phone: { type: string }
+
+    StaffAuthResponse:
+      type: object
+      required: [accessToken, expiresInSeconds, staff]
+      properties:
+        accessToken: { type: string }
+        expiresInSeconds: { type: integer }
+        staff:
+          $ref: "#/components/schemas/StaffUserResponse"
+
+    StaffUserResponse:
+      type: object
+      required: [id, email, fullName, status, roles, globalAccess, authorizedBranchIds]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        fullName: { type: string }
+        phone: { type: string }
+        status: { type: string, enum: [ACTIVE, DISABLED] }
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [SYSTEM_OWNER, HEAD_OFFICE_ADMIN, BRANCH_MANAGER, SALES_STAFF, INVENTORY_STAFF, DELIVERY_STAFF]
+        globalAccess: { type: boolean }
+        authorizedBranchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    StaffPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffUserResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    CreateStaffRequest:
+      type: object
+      required: [email, password, fullName, roles, authorizedBranchIds]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        fullName: { type: string, minLength: 2, maxLength: 150 }
+        phone: { type: string }
+        roles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [SYSTEM_OWNER, HEAD_OFFICE_ADMIN, BRANCH_MANAGER, SALES_STAFF, INVENTORY_STAFF, DELIVERY_STAFF]
+        authorizedBranchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    UpdateStaffAssignmentsRequest:
+      type: object
+      required: [status, roles, authorizedBranchIds]
+      properties:
+        status: { type: string, enum: [ACTIVE, DISABLED] }
+        roles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [SYSTEM_OWNER, HEAD_OFFICE_ADMIN, BRANCH_MANAGER, SALES_STAFF, INVENTORY_STAFF, DELIVERY_STAFF]
+        authorizedBranchIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    AdminProductResponse:
+      type: object
+      required: [id, categoryId, sku, name, unitLabel, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        categoryId: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        description: { type: string }
+        imageUrl: { type: string }
+        unitLabel: { type: string }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        availableFrom: { type: string, format: date-time }
+        availableUntil: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    AdminProductPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminProductResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    UpsertProductRequest:
+      type: object
+      required: [categoryId, sku, name, unitLabel, status]
+      properties:
+        categoryId: { type: string, format: uuid }
+        sku: { type: string, minLength: 2, maxLength: 64 }
+        name: { type: string, minLength: 2, maxLength: 200 }
+        description: { type: string }
+        imageUrl: { type: string }
+        unitLabel: { type: string, maxLength: 32 }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        availableFrom: { type: string, format: date-time }
+        availableUntil: { type: string, format: date-time }
+
+    UpsertBranchPriceRequest:
+      type: object
+      required: [unitPrice, isSellable]
+      properties:
+        unitPrice:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]{1,2})?$"
+          description: "Non-negative decimal string mapped to BigDecimal"
+        isSellable:
+          type: boolean
+
+    BranchPriceResponse:
+      type: object
+      required: [branchId, productId, unitPrice, currencyCode, isSellable, updatedAt]
+      properties:
+        branchId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        unitPrice: { type: string }
+        currencyCode: { type: string }
+        isSellable: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+
+    BranchInventoryItemResponse:
+      type: object
+      required: [branchId, productId, sku, productName, availableStock, reservedStock, updatedAt]
+      properties:
+        branchId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        sku: { type: string }
+        productName: { type: string }
+        availableStock: { type: integer, minimum: 0 }
+        reservedStock: { type: integer, minimum: 0 }
+        updatedAt: { type: string, format: date-time }
+
+    BranchInventoryPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BranchInventoryItemResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    InventoryMovementResponse:
+      type: object
+      required: [id, branchId, productId, reasonCode, quantityDelta, availableAfter, reservedAfter, sourceDocumentType, sourceDocumentId, actorType, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        branchId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        reasonCode: { type: string }
+        quantityDelta: { type: integer }
+        availableAfter: { type: integer }
+        reservedAfter: { type: integer }
+        sourceDocumentType: { type: string }
+        sourceDocumentId: { type: string, format: uuid }
+        actorId: { type: string, format: uuid }
+        actorType: { type: string }
+        note: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    InventoryMovementPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryMovementResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    CreateGoodsReceiptRequest:
+      type: object
+      required: [supplierName, lines]
+      properties:
+        supplierName: { type: string, minLength: 2, maxLength: 200 }
+        supplierReference: { type: string, maxLength: 100 }
+        note: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, receivedQuantity]
+            properties:
+              productId: { type: string, format: uuid }
+              receivedQuantity: { type: integer, minimum: 1 }
+
+    GoodsReceiptResponse:
+      type: object
+      required: [id, receiptNumber, branchId, supplierName, receivedByStaffId, receivedAt]
+      properties:
+        id: { type: string, format: uuid }
+        receiptNumber: { type: string }
+        branchId: { type: string, format: uuid }
+        supplierName: { type: string }
+        supplierReference: { type: string }
+        receivedByStaffId: { type: string, format: uuid }
+        receivedAt: { type: string, format: date-time }
+
+    CreateStockAdjustmentRequest:
+      type: object
+      required: [productId, adjustmentType, quantityDelta, reasonNote]
+      properties:
+        productId: { type: string, format: uuid }
+        adjustmentType: { type: string, enum: [SPOILAGE, DAMAGED, STOCKTAKE_ADJUSTMENT] }
+        quantityDelta: { type: integer, description: "Must be negative for SPOILAGE and DAMAGED" }
+        reasonNote: { type: string, minLength: 3, maxLength: 500 }
+
+    StockAdjustmentResponse:
+      type: object
+      required: [id, branchId, productId, adjustmentType, quantityDelta, availableStockAfter, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        branchId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        adjustmentType: { type: string }
+        quantityDelta: { type: integer }
+        availableStockAfter: { type: integer, minimum: 0 }
+        createdAt: { type: string, format: date-time }
+
+    CreateStockTransferRequest:
+      type: object
+      required: [sourceBranchId, targetBranchId, lines]
+      properties:
+        sourceBranchId: { type: string, format: uuid }
+        targetBranchId: { type: string, format: uuid }
+        note: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, requestedQuantity]
+            properties:
+              productId: { type: string, format: uuid }
+              requestedQuantity: { type: integer, minimum: 1 }
+
+    DispatchStockTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        note: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, dispatchedQuantity]
+            properties:
+              productId: { type: string, format: uuid }
+              dispatchedQuantity: { type: integer, minimum: 1 }
+
+    ReceiveStockTransferRequest:
+      type: object
+      required: [lines]
+      properties:
+        note: { type: string, maxLength: 500 }
+        lines:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, receivedQuantity]
+            properties:
+              productId: { type: string, format: uuid }
+              receivedQuantity: { type: integer, minimum: 0 }
+              discrepancyNote: { type: string, maxLength: 500 }
+
+    StockTransferResponse:
+      type: object
+      required: [id, transferNumber, sourceBranchId, targetBranchId, status, lines, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        transferNumber: { type: string }
+        sourceBranchId: { type: string, format: uuid }
+        targetBranchId: { type: string, format: uuid }
+        status: { type: string, enum: [REQUESTED, APPROVED, IN_TRANSIT, COMPLETED, CANCELLED, REJECTED] }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [productId, requestedQuantity]
+            properties:
+              productId: { type: string, format: uuid }
+              requestedQuantity: { type: integer }
+              dispatchedQuantity: { type: integer }
+              receivedQuantity: { type: integer }
+              discrepancyNote: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    StockTransferPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockTransferResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    OrderItemInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+
+    OrderQuoteRequest:
+      type: object
+      required: [fulfilmentType, items]
+      properties:
+        browsingBranchId:
+          type: string
+          format: uuid
+          description: "Branch whose prices the customer was viewing while browsing (REQ-017 / B11)"
+        fulfilmentType:
+          type: string
+          enum: [DELIVERY, PICKUP]
+        pickupBranchId:
+          type: string
+          format: uuid
+          description: "Required when fulfilmentType == PICKUP (B3c)"
+        deliveryLatitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        deliveryLongitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+
+    OrderQuoteResponse:
+      type: object
+      required: [processingBranchId, processingBranchName, priceChangedFromBrowsingBranch, itemsSubtotal, deliveryFee, totalAmount, currencyCode, lines]
+      properties:
+        processingBranchId: { type: string, format: uuid }
+        processingBranchName: { type: string }
+        priceChangedFromBrowsingBranch: { type: boolean }
+        itemsSubtotal: { type: string }
+        deliveryFee: { type: string }
+        totalAmount: { type: string }
+        currencyCode: { type: string, example: "VND" }
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLineSnapshotResponse"
+
+    PlaceOrderRequest:
+      type: object
+      required: [fulfilmentType, paymentMethod, recipientName, recipientPhone, items, confirmedTotalAmount]
+      properties:
+        fulfilmentType:
+          type: string
+          enum: [DELIVERY, PICKUP]
+        pickupBranchId:
+          type: string
+          format: uuid
+          description: "Used only when fulfilmentType == PICKUP. Ignored for DELIVERY orders (REQ-012, REQ-014)."
+        paymentMethod:
+          type: string
+          enum: [ONLINE_GATEWAY, COD, PAY_AT_PICKUP]
+        recipientName:
+          type: string
+          minLength: 2
+          maxLength: 150
+        recipientPhone:
+          type: string
+          minLength: 8
+          maxLength: 32
+        deliveryStreetAddress:
+          type: string
+          maxLength: 255
+        deliveryDistrict:
+          type: string
+          maxLength: 100
+        deliveryCity:
+          type: string
+          maxLength: 100
+        deliveryLatitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        deliveryLongitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        requestedSlotStart:
+          type: string
+          format: date-time
+        requestedSlotEnd:
+          type: string
+          format: date-time
+        confirmedTotalAmount:
+          type: string
+          description: "Customer-confirmed total from OrderQuoteResponse (protects against mid-checkout price surprises - B11)"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/OrderItemInput"
+
+    OrderLineSnapshotResponse:
+      type: object
+      required: [productId, skuSnapshot, productNameSnapshot, unitPriceSnapshot, quantity, lineTotalSnapshot]
+      properties:
+        productId: { type: string, format: uuid }
+        skuSnapshot: { type: string }
+        productNameSnapshot: { type: string }
+        unitPriceSnapshot: { type: string }
+        quantity: { type: integer }
+        lineTotalSnapshot: { type: string }
+
+    OrderDetailResponse:
+      type: object
+      required: [id, orderNumber, customerId, processingBranchId, fulfilmentType, status, paymentStatus, itemsSubtotal, deliveryFee, discountAmount, totalAmount, currencyCode, recipientName, recipientPhone, lines, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        orderNumber: { type: string }
+        customerId: { type: string, format: uuid }
+        processingBranchId: { type: string, format: uuid }
+        fulfilmentType: { type: string, enum: [DELIVERY, PICKUP] }
+        status:
+          type: string
+          enum: [PENDING_PAYMENT, CONFIRMED, PREPARING, READY_FOR_DELIVERY, OUT_FOR_DELIVERY, READY_FOR_PICKUP, COMPLETED, CANCELLED]
+        paymentStatus:
+          type: string
+          enum: [UNPAID, PAID, PARTIALLY_REFUNDED, REFUNDED]
+        itemsSubtotal: { type: string }
+        deliveryFee: { type: string }
+        discountAmount: { type: string }
+        totalAmount: { type: string }
+        currencyCode: { type: string }
+        recipientName: { type: string }
+        recipientPhone: { type: string }
+        deliveryStreetAddress: { type: string }
+        deliveryDistrict: { type: string }
+        deliveryCity: { type: string }
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderLineSnapshotResponse"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    OrderSummaryPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderDetailResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
+
+    CancelOrderRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 500 }
+
+    TransitionOrderStatusRequest:
+      type: object
+      required: [toStatus]
+      properties:
+        toStatus:
+          type: string
+          enum: [CONFIRMED, PREPARING, READY_FOR_DELIVERY, OUT_FOR_DELIVERY, READY_FOR_PICKUP, COMPLETED, CANCELLED]
+        note: { type: string, maxLength: 500 }
+
+    ReassignOrderBranchRequest:
+      type: object
+      required: [newProcessingBranchId, reason]
+      properties:
+        newProcessingBranchId: { type: string, format: uuid }
+        reason: { type: string, minLength: 5, maxLength: 500 }
+
+    PaymentWebhookPayload:
+      type: object
+      required: [eventId, transactionId, orderId, status, amount, currencyCode, occurredAt]
+      properties:
+        eventId: { type: string }
+        transactionId: { type: string }
+        orderId: { type: string, format: uuid }
+        status: { type: string, enum: [CAPTURED, FAILED] }
+        amount: { type: string }
+        currencyCode: { type: string }
+        occurredAt: { type: string, format: date-time }
+
+    WebhookAckResponse:
+      type: object
+      required: [eventId, outcome]
+      properties:
+        eventId: { type: string }
+        outcome: { type: string, enum: [PROCESSED, ALREADY_PROCESSED_IDEMPOTENT, IGNORED_STALE] }
+
+    CreateRefundRequest:
+      type: object
+      required: [refundAmount, reason]
+      properties:
+        refundAmount:
+          type: string
+          pattern: "^[0-9]+(\\.[0-9]{1,2})?$"
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+        externalRefundRef:
+          type: string
+          maxLength: 128
+
+    RefundResponse:
+      type: object
+      required: [id, paymentId, orderId, refundAmount, reason, approvedByStaffId, refundedAt]
+      properties:
+        id: { type: string, format: uuid }
+        paymentId: { type: string, format: uuid }
+        orderId: { type: string, format: uuid }
+        refundAmount: { type: string }
+        reason: { type: string }
+        externalRefundRef: { type: string }
+        approvedByStaffId: { type: string, format: uuid }
+        refundedAt: { type: string, format: date-time }
+
+    RevenueReportResponse:
+      type: object
+      required: [from, to, currencyCode, totalChainRevenue, totalChainOrders, branches]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        currencyCode: { type: string }
+        totalChainRevenue: { type: string }
+        totalChainOrders: { type: integer }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [branchId, branchName, completedOrdersCount, deliveryOrdersCount, pickupOrdersCount, grossRevenue]
+            properties:
+              branchId: { type: string, format: uuid }
+              branchName: { type: string }
+              completedOrdersCount: { type: integer }
+              deliveryOrdersCount: { type: integer }
+              pickupOrdersCount: { type: integer }
+              grossRevenue: { type: string }
+
+    AuditLogResponse:
+      type: object
+      required: [id, category, action, targetEntityType, actorType, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        category: { type: string }
+        action: { type: string }
+        branchId: { type: string, format: uuid }
+        targetEntityType: { type: string }
+        targetEntityId: { type: string, format: uuid }
+        actorId: { type: string, format: uuid }
+        actorType: { type: string }
+        oldValues: { type: object }
+        newValues: { type: object }
+        createdAt: { type: string, format: date-time }
+
+    AuditLogPageResponse:
+      type: object
+      required: [items, page, size, totalElements, totalPages]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogResponse"
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer }
+        totalPages: { type: integer }
