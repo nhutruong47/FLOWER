@@ -2,6 +2,23 @@
 
 Newest entries first. Each entry gives the date, what was done (with task IDs), the evidence, and what's next.
 
+## 2026-11-25: Backend restored, upgraded to Spring Boot 4.2, local PostgreSQL; P08 continues (TASK-014 to TASK-018)
+
+- **Context:** commit `5589216` brought in the P03–P08 work done in another tool's session (OpenCode/Gemini). That session stopped at its usage limit after writing the catalog, inventory and order code. The owner chose options a, b and c, then said "LÀM" (continue P08). DEC-028 records that instruction.
+- **Done:**
+  - TASK-014: 14 compile errors fixed; Testcontainers smoke test added (`5a0bfde`).
+  - TASK-015: Spring Boot 3.4.3 upgraded to 4.2.0 (`0d38c65`, DEC-026).
+  - TASK-016: portable PostgreSQL 16.16 set up for manual runs (DEC-027, resolves T12).
+  - Owner answer B15 recorded as REQ-018: deliveries go through third-party couriers (Grab, Shopee, Be…) and carry a delivery fee. Follow-up questions B15a–B15d added (`e428821`).
+- **Evidence:**
+  - `./mvnw -B -ntp clean verify -DskipITs` → BUILD SUCCESS, 0 warnings.
+  - App run against local PostgreSQL (2026-11-25 15:26): 8 migrations applied, Hibernate validate passed, health UP, public endpoint 200, admin without token 401 problem+json, malformed JSON 400.
+  - Integration tests were not run locally (no Docker); they will run in CI after the push.
+- **In progress:** two backend agents in separate worktrees.
+  - TASK-017: payment webhooks and refunds.
+  - TASK-018: defect fixes, revenue report, baseline tests.
+- **Next:** merge both branches, build, run the app against local PostgreSQL, security review, push the branch (asks for approval), then check CI.
+
 ## 2026-11-24: P07 UI/UX Design deliverables completed using Hallmark & Taste-Skill (TASK-013 → NEEDS_APPROVAL)
 
 - **Done (`frontend-developer` + `business-analyst` using `hallmark` and `design-taste-frontend` skills):**

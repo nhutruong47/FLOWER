@@ -1,13 +1,13 @@
 # Decisions register
 
-- **Last updated:** 2026-11-23
+- **Last updated:** 2026-11-25
 - **Statuses:** `PROPOSED` (awaiting owner approval) · `ACCEPTED` · `REJECTED` · `SUPERSEDED` (link the replacement)
 - **Rules:** IDs are never reused. A decision changes only through a new entry that supersedes it. Major architecture decisions also get an ADR in [docs/adr/](../docs/adr/).
 
 | ID | Decision | Status | Source | Date | Reference |
 |---|---|---|---|---|---|
 | DEC-001 | Modular monolith architecture | ACCEPTED | Owner brief | 2026-11-23 | [ADR-0001](../docs/adr/0001-technology-stack-and-repository-layout.md) |
-| DEC-002 | Backend: Java 21, Spring Boot 3.x (MVC, Security, Data JPA) | ACCEPTED | Owner brief | 2026-11-23 | ADR-0001 |
+| DEC-002 | Backend: Java 21, Spring Boot 3.x (MVC, Security, Data JPA) | ACCEPTED; Spring Boot version superseded by DEC-026 | Owner brief | 2026-11-23 | ADR-0001 |
 | DEC-003 | Backend build tool: Maven, through the Maven wrapper | ACCEPTED | Owner choice | 2026-11-23 | ADR-0001 |
 | DEC-004 | Database: PostgreSQL; schema managed only by Flyway | ACCEPTED | Owner brief | 2026-11-23 | ADR-0001 |
 | DEC-005 | Frontend: React + TypeScript + Vite + Tailwind; two apps (storefront, admin) plus a shared package in an npm workspace | ACCEPTED | Owner brief + owner choice | 2026-11-23 | ADR-0001 |
@@ -31,3 +31,6 @@
 | DEC-023 | Defer Redis and RabbitMQ in MVP: use PostgreSQL ACID queries for real-time branch stock/prices and Spring Modulith transactional domain events for internal notifications | PROPOSED | solution-architect (P05) | 2026-11-24 | [ADR-0008](../docs/architecture/architecture-decisions.md#adr-0008-caching-and-asynchronous-messaging-strategy-deferring-redis-and-rabbitmq-in-mvp-dec-023) |
 | DEC-024 | Product image storage via external/CDN URLs in PostgreSQL + pluggable `FileStoragePort` (no binary BLOBs in PostgreSQL) | PROPOSED | solution-architect (P05) | 2026-11-24 | [ADR-0009](../docs/architecture/architecture-decisions.md#adr-0009-product-image-and-static-asset-storage-strategy-dec-024) |
 | DEC-025 | Adopt Vitest + React Testing Library for frontend unit/component tests (resolves `T11`); local fast unit/ArchUnit tests + CI Testcontainers PostgreSQL 16 (resolves `T12`); Nginx + Spring Boot + PostgreSQL deployment topology | PROPOSED | solution-architect (P05) | 2026-11-24 | [ADR-0010](../docs/architecture/architecture-decisions.md#adr-0010-ci-first-verification-dec-015-and-containerized-deployment-topology-dec-025-resolves-t11-t12) |
+| DEC-026 | Backend runs on **Spring Boot 4.2.0** (Spring Framework 7.1, Spring Security 7.2, Hibernate 7.4, Jackson 3.1, Flyway 12.11, Spring Modulith 2.2, Testcontainers 2.0). This replaces the "Spring Boot 3.x" part of DEC-002; Java 21 and the rest of DEC-002 still apply. Jackson 2 defaults are kept through `spring.jackson.use-jackson2-defaults` so the API behaves as before. | ACCEPTED | Owner choice "c" (2026-11-25): Spring Boot 3.x open-source support ended 2026-06-30 | 2026-11-25 | TASK-015 |
+| DEC-027 | Local manual runs use **portable PostgreSQL 16.16** in the user profile (no admin rights, no Docker), listening only on localhost, with passwords in `pgpass.conf` and user environment variables and never in the repository. Automated integration tests still use Testcontainers in CI (DEC-015). Resolves T12. | ACCEPTED | Owner choice "b" (2026-11-25) | 2026-11-25 | TASK-016 |
+| DEC-028 | Backend implementation (P08) continues on the DRAFT requirements and the PROPOSED design (DEC-017 to DEC-025). Open business questions are not guessed: the payment provider (B4) gets only a sandbox adapter; the delivery fee and courier booking (B15a–B15d) and promotions (B6) wait for answers. Phase 3 sign-off of the requirements is still outstanding. | ACCEPTED | Owner instruction "LÀM" (2026-11-25) after the P08 brief | 2026-11-25 | TASK-017, TASK-018 |

@@ -46,7 +46,7 @@ Requirements from the owner's Phase 2 answers (REQ-013 onwards: delivery and pic
 | Area | Choice | Decision |
 |---|---|---|
 | Architecture | Modular monolith | DEC-001 |
-| Backend | Java 21, Spring Boot 3.x (Spring MVC, Spring Security, Spring Data JPA) | DEC-002 |
+| Backend | Java 21, Spring Boot 4.2 (Spring MVC, Spring Security, Spring Data JPA; Jackson 3) | DEC-002, DEC-026 |
 | Build | Maven via wrapper (`mvnw`) | DEC-003 |
 | Database | PostgreSQL, Flyway | DEC-004 |
 | Frontend | React, TypeScript, Vite, Tailwind CSS; two apps (storefront, admin) plus a shared package in an npm workspace | DEC-005 |
@@ -56,7 +56,14 @@ Requirements from the owner's Phase 2 answers (REQ-013 onwards: delivery and pic
 
 Adding any other framework or library requires a new DEC entry and human approval.
 
-**Build and test commands:** none yet. List them here once `backend/` and `frontend/` exist.
+**Build and test commands** (backend; the frontend does not exist yet):
+
+- Build and unit tests, from `backend/`: `./mvnw -B -ntp clean verify -DskipITs`.
+- Integration tests (`*IT`, Testcontainers) need Docker, so they run in GitHub Actions only (`.github/workflows/backend-ci.yml`, DEC-015).
+- Local PostgreSQL for manual runs (DEC-027):
+  - Start: `"$LOCALAPPDATA/Programs/PostgreSQL16/pgsql/bin/pg_ctl.exe" -D "$LOCALAPPDATA/FlowerChain/pgdata" -l "$LOCALAPPDATA/FlowerChain/postgres.log" start`. Stop: the same command with `stop`.
+  - Connection settings come from the user environment variables `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`. Never print the password or commit it.
+- Run the app, from `backend/`: `java -jar target/flowerchain-backend-0.1.0-SNAPSHOT.jar`, then check `http://localhost:8080/actuator/health`.
 
 ## 4. Architecture principles
 

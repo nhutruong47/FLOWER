@@ -1,6 +1,6 @@
 # Tasks
 
-- **Last updated:** 2026-11-24
+- **Last updated:** 2026-11-25
 
 ## Status workflow
 
@@ -47,6 +47,11 @@ Every new task must specify:
 | TASK-011 | P05 solution architecture: stack evaluation, module map, multi-branch security, diagrams & ADRs | 4 | solution-architect + security-reviewer | NEEDS_APPROVAL | TASK-010 |
 | TASK-012 | P06 database and API design: ERD, data dictionary, migration plan, OpenAPI 3.1 & consistency check | 5 | database-engineer + solution-architect | NEEDS_APPROVAL | TASK-011 |
 | TASK-013 | P07 UI/UX design (Hallmark & Taste-Skill): design system, sitemaps, wireframes & UI ACs | 6 | frontend-developer + business-analyst | NEEDS_APPROVAL | TASK-012 |
+| TASK-014 | Restore backend compilation and add a Testcontainers smoke test | 7 | backend-developer | TESTING (CI run pending) | owner choice "a", 2026-11-25 |
+| TASK-015 | Upgrade the backend to Spring Boot 4.2.0 | 7 | backend-developer | TESTING (CI run + security review pending) | TASK-014, owner choice "c", 2026-11-25 |
+| TASK-016 | Local PostgreSQL for manual runs (no admin, no Docker) | 7 | Orchestrator | DONE | owner choice "b", 2026-11-25 |
+| TASK-017 | Payment module: verified, idempotent webhooks and refunds | 8 | backend-developer + security-reviewer | IN_PROGRESS | TASK-015, DEC-028 |
+| TASK-018 | Backend defect fixes, revenue report, baseline tests | 8 | backend-developer + qa-engineer | IN_PROGRESS | TASK-015, DEC-028 |
 
 ## Details
 
@@ -173,3 +178,71 @@ Every new task must specify:
   - [x] AC5: Responsive specifications (`1920px`, `1440x900`, `1280x800`, `1024x768`, `820x1180`, `768x1024`, `390x844`, `320px`) and testable UI Acceptance Criteria (`UI-AC-01`..`11`) documented. Evidence: `docs/ui-ux/responsive-and-ui-acceptance-criteria.md`.
   - [ ] AC6: Owner approves the P07 UI/UX design (`NEEDS_APPROVAL`) before proceeding to P08.
 - **Test Cases:** `TEST-015`, `TEST-019`, `UI-AC-01`..`11`; `test-protect-secrets.sh` (`27/27 PASS`), `git diff --check` (`PASS`).
+
+### TASK-014: Restore backend compilation and add a Testcontainers smoke test
+- **Objective:** make the backend from commit `5589216` (written in another tool's session, which stopped at its usage limit) compile again, and add the first integration test so CI checks migrations.
+- **Scope:** only the missing API methods the existing code already calls; one smoke integration test. No new features.
+- **Dependencies:** owner choice "a" (2026-11-25). DEC-015 (integration tests run in CI only).
+- **Files affected:** `shared/api/FlowerChainPrincipal.java` (`actorId()`), `customer/api/CustomerApi.java` and `customer/application/CustomerService.java` (`getCustomerOrThrow`), new `backend/src/test/java/com/flowerchain/FlowerChainApplicationIT.java`.
+- **Acceptance criteria**
+  - [x] AC1: the backend compiles. Evidence: before, 14 distinct compile errors; after, `./mvnw -B -ntp verify -DskipITs` → BUILD SUCCESS (commit `5a0bfde`).
+  - [ ] AC2: `FlowerChainApplicationIT` passes in GitHub Actions: context loads, every Flyway migration is applied, `ddl-auto=validate`. Not run locally (no Docker). Waiting for the branch push.
+- **Test Cases:** `FlowerChainApplicationIT` (CI). Runtime check against local PostgreSQL done in TASK-016.
+
+### TASK-015: Upgrade the backend to Spring Boot 4.2.0
+- **Objective:** move off Spring Boot 3.x, whose open-source support ended on 2026-06-30, without changing API behaviour.
+- **Scope:** dependency versions, renamed starters and properties, compile fixes, compatibility switches. No feature changes. See DEC-026.
+- **Dependencies:** TASK-014; owner choice "c" (2026-11-25).
+- **Files affected:** `backend/pom.xml`, `backend/src/main/resources/application.yml`, `shared/internal/IdempotencyService.java` (Jackson 3 import), `shared/api/FlowerChainException.java` (`UNPROCESSABLE_CONTENT`), `FlowerChainApplicationIT.java` (Testcontainers 2 class).
+- **Acceptance criteria**
+  - [x] AC1: build passes with no warnings. Evidence: `./mvnw -B -ntp clean verify -DskipITs` → BUILD SUCCESS, 0 compiler warnings or deprecations; `dependency:tree` → `spring-boot 4.2.0`, `flyway-core 12.11.0`.
+  - [x] AC2: the app starts on 4.2.0 against PostgreSQL. Evidence (2026-11-25 15:26): `java -jar` against local PostgreSQL 16.16 → "Successfully applied 8 migrations", Hibernate validate passed, `Started FlowerChainApplication in 8.6 s`; `/actuator/health` → `{"status":"UP"}`; `GET /api/v1/storefront/branches` → 200; `GET /api/v1/admin/branches` without a token → 401 problem+json; malformed JSON → 400.
+  - [x] AC3: API behaviour unchanged. `spring.jackson.use-jackson2-defaults: true` keeps the Jackson 2 defaults (otherwise missing primitive fields would return 500); liveness and readiness probes stay off as in Boot 3.
+  - [ ] AC4: `FlowerChainApplicationIT` passes in CI.
+  - [ ] AC5: the security reviewer checks the Spring Security 7 upgrade (no matcher or permitAll changes were made).
+- **Test Cases:** build and runtime evidence above; `FlowerChainApplicationIT` (CI).
+
+### TASK-016: Local PostgreSQL for manual runs
+- **Objective:** let developers run the app by hand without Docker or admin rights (resolves T12, DEC-027).
+- **Scope:** portable PostgreSQL 16.16 in the user profile, a local-only server, the `flowerchain` role and database, and passwords outside the repository.
+- **Dependencies:** owner choice "b" (2026-11-25); DEC-015.
+- **Files affected:** none in the repository. Machine setup only: binaries in `%LOCALAPPDATA%\Programs\PostgreSQL16`, data in `%LOCALAPPDATA%\FlowerChain\pgdata`, passwords in `%APPDATA%\postgresql\pgpass.conf`, user environment variables `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME` and `SPRING_DATASOURCE_PASSWORD`.
+- **Acceptance criteria**
+  - [x] AC1: the server listens only on `127.0.0.1` and `::1`, port 5432, with `scram-sha-256` password authentication. Evidence: `pg_ctl status` → running.
+  - [x] AC2: the app runs against it. Evidence: TASK-015 AC2.
+  - [x] AC3: no password is committed or printed. Passwords are random and live only in `pgpass.conf` and the user environment.
+- **Test Cases:** runtime check in TASK-015 AC2. Start and stop commands are in `CLAUDE.md` §3.
+
+### TASK-017: Payment module (verified, idempotent webhooks and refunds)
+- **Objective:** implement FR-025 to FR-027: server-side webhook signature verification (REQ-009), exactly-once processing (REQ-010) and refunds with an audit trail.
+- **Scope:** `com.flowerchain.payment` with only a `sandbox-hmac` adapter, because the provider is still open (B4). Other providers are rejected until then. Also the guard so that only `PENDING_PAYMENT`/`UNPAID` orders become paid. Money movement at the provider is out of scope.
+- **Dependencies:** TASK-015; DEC-022 (PROPOSED); DEC-028.
+- **Files affected:** `backend/src/main/java/com/flowerchain/payment/**`; `order/api/OrderApi.java`, `order/application/OrderService.java` (webhook method only), `order/internal/OrderEntity.java`; tests under `backend/src/test/java/com/flowerchain/payment/**`; the payment and refund paths in `docs/api/openapi.yaml`.
+- **Acceptance criteria**
+  - [ ] AC1: a webhook with a missing or invalid signature is rejected with 401 and writes nothing (TEST-011).
+  - [ ] AC2: webhooks are rejected while the secret is blank, the placeholder, or shorter than 32 characters (fail closed).
+  - [ ] AC3: the same event delivered twice, including concurrently, is processed once (TEST-012).
+  - [ ] AC4: amount or currency mismatches and stale or out-of-order events never mark an order paid, and are audited.
+  - [ ] AC5: refunds need `Idempotency-Key`, respect branch scope (REQ-011/012), cannot exceed the captured amount, and are audited.
+  - [ ] AC6: unit tests pass locally; integration tests pass in CI; the security reviewer approves.
+- **Test Cases:** TEST-011, TEST-012, plus unit tests listed in the task report.
+
+### TASK-018: Backend defect fixes, revenue report, baseline tests
+- **Objective:** fix the defects found when reviewing the imported backend code, add the revenue report (FR-034), and write the baseline tests required by `CLAUDE.md` §9.
+- **Scope:**
+  - Defects: order and document numbers from PostgreSQL sequences (they collided after a restart); no customer email in failed-login audit entries; the token filter registered only once; inactive customers cannot order; CORS wired to the configured origins; no generated default user.
+  - The `/api/v1/admin/reports/revenue` endpoint.
+  - Tests for REQ-006, REQ-007, REQ-008, REQ-011 and REQ-012.
+  - Out of scope: the delivery fee (B15a, B15b) and the customer token design (DEC-020).
+- **Dependencies:** TASK-015; DEC-028.
+- **Files affected:**
+  - Code: `order/**`, `inventory/**`, `customer/**`, `identity/**`, `shared/security/**`, new `reporting/**`.
+  - A new Flyway migration for the number sequences.
+  - Tests under `backend/src/test/java/**`.
+- **Acceptance criteria**
+  - [ ] AC1: document numbers stay unique across restarts (database sequences).
+  - [ ] AC2: each listed defect is fixed and covered by a test.
+  - [ ] AC3: the revenue report uses order snapshots only and respects branch scope.
+  - [ ] AC4: TEST-007, TEST-008, TEST-009, TEST-010, TEST-013 and TEST-014 are implemented. Unit tests pass locally; integration tests pass in CI.
+  - [ ] AC5: the security reviewer approves the security-related changes (CORS, filter, audit).
+- **Test Cases:** TEST-007, TEST-008, TEST-009, TEST-010, TEST-013, TEST-014.

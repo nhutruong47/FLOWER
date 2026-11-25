@@ -55,4 +55,4 @@ Questions that must be answered before the related features are built. No busine
 | T9 | Enforce backend module boundaries with Spring Modulith, ArchUnit, or by convention only? | _open_ |
 | T10 | PostgreSQL major version to target? | _open_ |
 | T11 | Which frontend unit and component test tool? (The brief lists only Playwright, which is for end-to-end tests.) | _open_ (decide in Phase 4) |
-| T12 | Without local Docker (DEC-015), how do developers run PostgreSQL to try the app by hand: portable PostgreSQL binaries (no admin), a shared development database, or automated tests only? | _open_ (decide before Phase 7) |
+| T12 | Without local Docker (DEC-015), how do developers run PostgreSQL to try the app by hand: portable PostgreSQL binaries (no admin), a shared development database, or automated tests only? | **Portable PostgreSQL 16.16** in the user profile, localhost only. Owner choice "b", 2026-11-25 (DEC-027, TASK-016). Integration tests still run in CI. |
