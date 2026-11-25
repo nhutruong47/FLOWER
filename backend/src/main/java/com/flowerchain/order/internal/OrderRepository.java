@@ -1,5 +1,7 @@
 package com.flowerchain.order.internal;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +13,10 @@ public interface OrderRepository extends JpaRepository<OrderEntity, UUID> {
     List<OrderEntity> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
 
     List<OrderEntity> findAllByOrderByCreatedAtDesc();
+
+    /** Orders processed by one of the given branches and created in the half-open range {@code [from, to)}. */
+    List<OrderEntity> findByProcessingBranchIdInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+            Collection<UUID> processingBranchIds, Instant from, Instant to);
 
     /**
      * Next value of the {@code order_number_seq} database sequence (TASK-018). The sequence survives application
