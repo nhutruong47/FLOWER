@@ -1,6 +1,7 @@
 package com.flowerchain.shared.web;
 
 import com.flowerchain.shared.api.FlowerChainException;
+import jakarta.persistence.OptimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.Clock;
@@ -10,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -19,6 +21,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,6 +66,45 @@ public class GlobalExceptionHandler {
         problem.setProperty("timestamp", Instant.now(clock).toString());
         problem.setProperty("errors", fieldErrors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+
+    /**
+     * A concurrent change won (optimistic version mismatch, or a lock conflict such as a deadlock victim). Nothing
+     * from this request was committed; the client may reload and retry.
+     */
+    @ExceptionHandler({ConcurrencyFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<ProblemDetail> handleConcurrentModification(
+            RuntimeException ex, HttpServletRequest request) {
+        String requestId = resolveRequestId(request);
+        log.warn("Concurrent modification for requestId={} uri={}: {}",
+                requestId, request.getRequestURI(), ex.getClass().getSimpleName());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "The resource was changed by another request at the same time. Reload it and try again.");
+        problem.setType(URI.create("https://flowerchain.com/problems/concurrent-modification"));
+        problem.setTitle("Concurrent modification");
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("errorCode", "CONCURRENT_MODIFICATION");
+        problem.setProperty("requestId", requestId);
+        problem.setProperty("timestamp", Instant.now(clock).toString());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+
+    /** No endpoint for this method and path: 404 Problem Details instead of the 500 catch-all. */
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ProblemDetail> handleNoEndpoint(Exception ex, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "No such endpoint.");
+        problem.setType(URI.create("https://flowerchain.com/problems/resource-not-found"));
+        problem.setTitle("Resource not found");
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("errorCode", "RESOURCE_NOT_FOUND");
+        problem.setProperty("requestId", resolveRequestId(request));
+        problem.setProperty("timestamp", Instant.now(clock).toString());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
     }

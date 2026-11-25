@@ -330,7 +330,7 @@ public class OrderService implements OrderApi {
     @Transactional
     public OrderDetailDto cancelCustomerOrder(UUID customerId, UUID orderId, String reason) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .filter(o -> o.getCustomerId().equals(customerId))
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
 
@@ -431,7 +431,7 @@ public class OrderService implements OrderApi {
             boolean callerHasGlobalAccess,
             Set<UUID> callerAuthorizedBranchIds) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         if (!callerHasGlobalAccess
                 && (callerAuthorizedBranchIds == null || !callerAuthorizedBranchIds.contains(order.getProcessingBranchId()))) {
@@ -512,7 +512,7 @@ public class OrderService implements OrderApi {
             String reason,
             UUID staffActorId) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
 
         if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"CONFIRMED".equals(order.getStatus())) {
@@ -664,7 +664,7 @@ public class OrderService implements OrderApi {
     public void recordOrderRefunded(
             UUID orderId, BigDecimal refundedAmount, boolean fullRefund, UUID staffActorId, String reason) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         String oldPaymentStatus = order.getPaymentStatus();
         String newPaymentStatus = fullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
@@ -788,6 +788,14 @@ public class OrderService implements OrderApi {
                     "INVALID_ORDER_TRANSITION",
                     "Terminal order status",
                     "Order in terminal status " + fromStatus + " cannot transition to " + toStatus + ".");
+        }
+        if ("PENDING_PAYMENT".equals(fromStatus) && !"CANCELLED".equals(toStatus)) {
+            // An unpaid online-payment order is confirmed only by a server-verified payment webhook (REQ-009).
+            throw FlowerChainException.conflict(
+                    "INVALID_ORDER_TRANSITION",
+                    "Order is awaiting payment",
+                    "An order in PENDING_PAYMENT can only be cancelled by staff; it is confirmed only by a "
+                            + "verified payment.");
         }
         if ("READY_FOR_PICKUP".equals(toStatus) && !"PICKUP".equals(fulfilmentType)) {
             throw FlowerChainException.conflict(

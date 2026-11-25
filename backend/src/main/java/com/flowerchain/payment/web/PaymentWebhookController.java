@@ -2,6 +2,7 @@ package com.flowerchain.payment.web;
 
 import com.flowerchain.payment.application.PaymentWebhookService;
 import com.flowerchain.payment.application.WebhookAckResponse;
+import com.flowerchain.payment.gateway.PaymentGatewayPort;
 import com.flowerchain.shared.api.FlowerChainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
@@ -34,8 +35,10 @@ public class PaymentWebhookController {
             @PathVariable("provider") String provider,
             @RequestHeader HttpHeaders headers,
             HttpServletRequest request) throws IOException {
+        // Unsupported or disabled providers are rejected before the body is read.
+        PaymentGatewayPort gateway = webhookService.resolveGateway(provider);
         byte[] rawBody = readRawBody(request);
-        return webhookService.receive(provider, rawBody, headers);
+        return webhookService.receive(gateway, rawBody, headers);
     }
 
     private static byte[] readRawBody(HttpServletRequest request) throws IOException {

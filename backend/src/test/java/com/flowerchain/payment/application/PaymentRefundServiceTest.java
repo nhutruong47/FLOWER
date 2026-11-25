@@ -170,24 +170,32 @@ class PaymentRefundServiceTest {
     }
 
     @Test
-    void branchManagerOfAnotherBranchGets404AndNothingIsWritten() {
-        givenPaymentWithoutRefundLookup("CAPTURED");
-
+    void branchManagersAreForbiddenUntilB20IsAnswered() {
+        // F5: roles-and-permissions.md marks BRANCH_MANAGER refunds "BRANCH ?" pending B20.
+        assertThat(PaymentRefundService.REFUND_ROLES).containsExactlyInAnyOrder("SYSTEM_OWNER", "HEAD_OFFICE_ADMIN");
+        assertProblem(
+                () -> service.createRefund(MANAGER_A, PAYMENT_ID, new BigDecimal("1000"), REASON, null),
+                HttpStatus.FORBIDDEN,
+                "AUTH_FORBIDDEN_ROLE");
         assertProblem(
                 () -> service.createRefund(MANAGER_B, PAYMENT_ID, new BigDecimal("1000"), REASON, null),
-                HttpStatus.NOT_FOUND,
-                "RESOURCE_NOT_FOUND");
-        assertNothingWritten();
+                HttpStatus.FORBIDDEN,
+                "AUTH_FORBIDDEN_ROLE");
+        verifyNoInteractions(paymentRepository, refundRepository, orderApi, auditApi);
     }
 
     @Test
-    void branchManagerOfTheProcessingBranchMayRefund() {
-        givenPayment("CAPTURED", null);
-        givenRefundSaved();
+    void callerWithoutAccessToTheProcessingBranchGets404AndNothingIsWritten() {
+        // Defence in depth (REQ-011/012): a refund role without access to the order's branch must not see it.
+        FlowerChainPrincipal scopedAdmin = new FlowerChainPrincipal(
+                UUID.randomUUID(), "scoped@example.test", "STAFF", Set.of("HEAD_OFFICE_ADMIN"), false, Set.of(BRANCH_B));
+        givenPaymentWithoutRefundLookup("CAPTURED");
 
-        RefundResponse response = service.createRefund(MANAGER_A, PAYMENT_ID, new BigDecimal("1000"), REASON, null);
-
-        assertThat(response.approvedByStaffId()).isEqualTo(MANAGER_A.actorId());
+        assertProblem(
+                () -> service.createRefund(scopedAdmin, PAYMENT_ID, new BigDecimal("1000"), REASON, null),
+                HttpStatus.NOT_FOUND,
+                "RESOURCE_NOT_FOUND");
+        assertNothingWritten();
     }
 
     @Test

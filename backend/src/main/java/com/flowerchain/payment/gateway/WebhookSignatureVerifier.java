@@ -10,6 +10,7 @@ public interface WebhookSignatureVerifier {
         SECRET_NOT_CONFIGURED,
         MISSING_SIGNATURE,
         MALFORMED_SIGNATURE,
+        MISSING_TIMESTAMP,
         MALFORMED_TIMESTAMP,
         SIGNATURE_MISMATCH,
         /** The signature is authentic but the signed timestamp is outside the allowed window (replay). */
@@ -22,7 +23,7 @@ public interface WebhookSignatureVerifier {
     /**
      * @param rawBody the request body exactly as received
      * @param signatureHeader the signature header value, or {@code null} if absent
-     * @param timestampHeader the timestamp header value, or {@code null} if absent
+     * @param timestampHeader the timestamp header value, or {@code null} if absent (absent fails verification)
      */
     Result verify(byte[] rawBody, String signatureHeader, String timestampHeader);
 }

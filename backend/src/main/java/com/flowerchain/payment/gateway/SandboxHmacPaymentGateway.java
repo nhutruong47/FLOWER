@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -18,14 +19,20 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Sandbox payment provider adapter (ADR-0007): HMAC-SHA256 over the raw body with the shared secret
- * {@code flowerchain.payment.webhook-secret}. See {@link HmacSha256WebhookSignatureVerifier} for the exact
- * signing scheme. Real provider adapters (B4) plug into {@link PaymentGatewayPort} next to this one.
+ * Sandbox payment provider adapter (ADR-0007): HMAC-SHA256 over the raw body with the secret
+ * {@value #SECRET_PROPERTY}. See {@link HmacSha256WebhookSignatureVerifier} for the exact signing scheme. Real
+ * provider adapters (B4) plug into {@link PaymentGatewayPort} next to this one.
+ *
+ * <p>Off unless {@value #ENABLED_PROPERTY} is {@code true} (security review F2). When off, the bean does not exist
+ * and {@code sandbox-hmac} is rejected like any unsupported provider.
  */
 @Component
+@ConditionalOnBooleanProperty(name = SandboxHmacPaymentGateway.ENABLED_PROPERTY)
 public class SandboxHmacPaymentGateway implements PaymentGatewayPort {
 
     public static final String PROVIDER_CODE = "sandbox-hmac";
+    public static final String ENABLED_PROPERTY = "flowerchain.payment.sandbox-hmac.enabled";
+    public static final String SECRET_PROPERTY = "flowerchain.payment.sandbox-hmac.webhook-secret";
     public static final String SIGNATURE_HEADER = "X-Payment-Signature";
     public static final String TIMESTAMP_HEADER = "X-Payment-Timestamp";
 
@@ -41,16 +48,17 @@ public class SandboxHmacPaymentGateway implements PaymentGatewayPort {
     private final ObjectMapper objectMapper;
 
     public SandboxHmacPaymentGateway(
-            @Value("${flowerchain.payment.webhook-secret:}") String webhookSecret,
+            @Value("${" + SECRET_PROPERTY + ":}") String webhookSecret,
             Clock clock,
             ObjectMapper objectMapper) {
         this.verifier = new HmacSha256WebhookSignatureVerifier(webhookSecret, clock);
         this.objectMapper = objectMapper;
         if (!verifier.isConfigured()) {
             // Logged once, at startup. Never log the secret itself (or its length).
-            log.warn("Payment webhook secret 'flowerchain.payment.webhook-secret' is blank, the development "
-                            + "placeholder, or shorter than {} characters. Every '{}' webhook will be rejected with "
-                            + "503 until FLOWERCHAIN_PAYMENT_WEBHOOK_SECRET is set to a strong secret.",
+            log.warn("Payment webhook secret '{}' is blank, a placeholder, or shorter than {} characters. Every "
+                            + "'{}' webhook will be rejected with 503 until FLOWERCHAIN_PAYMENT_SANDBOX_HMAC_WEBHOOK_SECRET "
+                            + "is set to a strong secret.",
+                    SECRET_PROPERTY,
                     HmacSha256WebhookSignatureVerifier.MIN_SECRET_LENGTH,
                     PROVIDER_CODE);
         }

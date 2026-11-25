@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -86,6 +87,15 @@ public class OrderEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Optimistic-locking safety net (security review F1): a stale write fails instead of silently overwriting a
+     * concurrent payment or status change. Order mutators also take the row lock first. A wrapper type, so a
+     * new order ({@code null}) is persisted rather than merged.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     protected OrderEntity() {}
 
@@ -275,5 +285,9 @@ public class OrderEntity {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 }

@@ -25,16 +25,16 @@ import tools.jackson.databind.ObjectMapper;
  * Records refunds of captured payments (FR-027, BRULE-025). The money movement at the provider is manual and
  * out of scope; staff record it here with {@code externalRefundRef}.
  *
- * <p>Authorization (roles-and-permissions.md, FR-027 row): {@code SYSTEM_OWNER} and {@code HEAD_OFFICE_ADMIN}
- * for every branch; {@code BRANCH_MANAGER} only for payments whose order is processed by one of the manager's
- * server-resolved branches (REQ-011, REQ-012). Other branches get 404 so the payment's existence does not
- * leak.
+ * <p>Authorization: only {@code SYSTEM_OWNER} and {@code HEAD_OFFICE_ADMIN} (global). roles-and-permissions.md
+ * marks {@code BRANCH_MANAGER} refunds as "BRANCH ?" pending B20, so branch managers are denied until the owner
+ * answers (security review F5). The branch check below stays as defence in depth (REQ-011, REQ-012): a caller
+ * without access to the order's processing branch gets 404, so the payment's existence does not leak.
  */
 @Service
 public class PaymentRefundService {
 
-    /** Roles that may record a refund (branch scope is checked separately). */
-    public static final List<String> REFUND_ROLES = List.of("SYSTEM_OWNER", "HEAD_OFFICE_ADMIN", "BRANCH_MANAGER");
+    /** Roles that may record a refund. BRANCH_MANAGER is excluded until B20 is answered. */
+    public static final List<String> REFUND_ROLES = List.of("SYSTEM_OWNER", "HEAD_OFFICE_ADMIN");
 
     private final PaymentRepository paymentRepository;
     private final PaymentRefundRepository refundRepository;

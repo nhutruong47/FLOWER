@@ -4,97 +4,49 @@ import static com.flowerchain.payment.WebhookTestSignatures.OTHER_SECRET;
 import static com.flowerchain.payment.WebhookTestSignatures.SECRET;
 import static com.flowerchain.payment.WebhookTestSignatures.payload;
 import static com.flowerchain.payment.WebhookTestSignatures.sign;
+import static com.flowerchain.payment.WebhookTestSignatures.signBodyOnly;
+import static com.flowerchain.payment.WebhookTestSignatures.signedHeaders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.math.BigDecimal;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import javax.sql.DataSource;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * TEST-011 (REQ-009) and TEST-012 (REQ-010) against the real application, HTTP stack, security filter chain and
  * PostgreSQL 16. Requires Docker, so it runs in CI only (DEC-015).
  */
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "flowerchain.payment.webhook-secret=" + WebhookTestSignatures.SECRET)
-@Testcontainers
-class PaymentWebhookIT {
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
-
-    private static final String PROVIDER = "sandbox-hmac";
-    private static final BigDecimal TOTAL = new BigDecimal("500000.00");
-
-    @LocalServerPort
-    private int port;
-
-    @Autowired
-    private DataSource dataSource;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    private final HttpClient http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build();
-    private JdbcTemplate jdbc;
-
-    @BeforeEach
-    void setUp() {
-        jdbc = new JdbcTemplate(dataSource);
-    }
+class PaymentWebhookIT extends PaymentItSupport {
 
     // ---------------------------------------------------------------- TEST-011: forged webhooks (REQ-009)
 
     @Test
-    void test011_forgedMissingTamperedAndStaleSignaturesAreRejectedWithoutWritingAnything() throws Exception {
-        UUID orderId = seedPendingOrder();
+    void test011_forgedMissingTamperedUntimestampedAndStaleSignaturesWriteNothing() throws Exception {
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_forged_" + shortId();
         String transactionId = "txn_forged_" + shortId();
         byte[] body = payload(eventId, transactionId, orderId, "CAPTURED", "500000.00", "VND");
+        long now = Instant.now().getEpochSecond();
         long eventsBefore = count("SELECT count(*) FROM payment_webhook_events");
         long paymentsBefore = count("SELECT count(*) FROM payments");
         long auditsBefore = count("SELECT count(*) FROM audit_logs");
 
-        HttpResponse<String> forged = post(PROVIDER, body, signatureHeaders(sign(OTHER_SECRET, body)));
-        HttpResponse<String> missing = post(PROVIDER, body, Map.of());
+        HttpResponse<String> forged = postWebhook(PROVIDER, body, signedHeaders(OTHER_SECRET, now, body));
+        HttpResponse<String> missingSignature =
+                postWebhook(PROVIDER, body, Map.of("X-Payment-Timestamp", Long.toString(now)));
         byte[] tampered = payload(eventId, transactionId, orderId, "CAPTURED", "1.00", "VND");
-        HttpResponse<String> tamperedBody = post(PROVIDER, tampered, signatureHeaders(sign(SECRET, body)));
-        String staleTimestamp = Long.toString(Instant.now().getEpochSecond() - 3600);
-        Map<String, String> staleHeaders = new LinkedHashMap<>();
-        staleHeaders.put("X-Payment-Signature", sign(SECRET, staleTimestamp, body));
-        staleHeaders.put("X-Payment-Timestamp", staleTimestamp);
-        HttpResponse<String> stale = post(PROVIDER, body, staleHeaders);
+        HttpResponse<String> tamperedBody = postWebhook(PROVIDER, tampered, signedHeaders(SECRET, now, body));
+        HttpResponse<String> noTimestamp =
+                postWebhook(PROVIDER, body, Map.of("X-Payment-Signature", signBodyOnly(SECRET, body)));
+        HttpResponse<String> stale = postWebhook(PROVIDER, body, signedHeaders(SECRET, now - 3600, body));
 
-        for (HttpResponse<String> response : List.of(forged, missing, tamperedBody, stale)) {
+        for (HttpResponse<String> response : List.of(forged, missingSignature, tamperedBody, noTimestamp, stale)) {
             assertThat(response.statusCode()).isEqualTo(401);
             assertThat(response.headers().firstValue("Content-Type")).hasValueSatisfying(
                     type -> assertThat(type).startsWith("application/problem+json"));
@@ -109,12 +61,13 @@ class PaymentWebhookIT {
 
     @Test
     void test011_undecidedProvidersAreRejectedWithoutWritingAnything() throws Exception {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         byte[] body = payload("evt_vnpay_" + shortId(), "txn_vnpay_" + shortId(), orderId, "CAPTURED", "500000.00", "VND");
         long eventsBefore = count("SELECT count(*) FROM payment_webhook_events");
 
         for (String provider : List.of("vnpay", "momo")) {
-            HttpResponse<String> response = post(provider, body, signatureHeaders(sign(SECRET, body)));
+            HttpResponse<String> response =
+                    postWebhook(provider, body, signedHeaders(SECRET, Instant.now().getEpochSecond(), body));
             assertThat(response.statusCode()).isEqualTo(400);
             assertThat(response.body()).contains("PAYMENT_PROVIDER_NOT_SUPPORTED");
         }
@@ -126,14 +79,14 @@ class PaymentWebhookIT {
 
     @Test
     void test012_sameEventDeliveredTwiceSequentiallyIsProcessedOnce() throws Exception {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_seq_" + shortId();
         String transactionId = "txn_seq_" + shortId();
         byte[] body = payload(eventId, transactionId, orderId, "CAPTURED", "500000", "VND");
-        Map<String, String> headers = signatureHeaders(sign(SECRET, body));
+        Map<String, String> headers = signedHeaders(SECRET, Instant.now().getEpochSecond(), body);
 
-        HttpResponse<String> first = post(PROVIDER, body, headers);
-        HttpResponse<String> second = post(PROVIDER, body, headers);
+        HttpResponse<String> first = postWebhook(PROVIDER, body, headers);
+        HttpResponse<String> second = postWebhook(PROVIDER, body, headers);
 
         assertThat(first.statusCode()).isEqualTo(200);
         assertThat(outcome(first)).isEqualTo("PROCESSED");
@@ -144,13 +97,13 @@ class PaymentWebhookIT {
 
     @Test
     void test012_sameEventDeliveredConcurrentlyIsProcessedOnce() throws Exception {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_conc_" + shortId();
         String transactionId = "txn_conc_" + shortId();
         byte[] body = payload(eventId, transactionId, orderId, "CAPTURED", "500000.00", "VND");
-        Map<String, String> headers = signatureHeaders(sign(SECRET, body));
+        Map<String, String> headers = signedHeaders(SECRET, Instant.now().getEpochSecond(), body);
 
-        List<HttpResponse<String>> responses = sendConcurrently(8, i -> post(PROVIDER, body, headers));
+        List<HttpResponse<String>> responses = responses(runConcurrently(8, i -> postWebhook(PROVIDER, body, headers)));
 
         assertThat(responses).allSatisfy(r -> assertThat(r.statusCode()).isEqualTo(200));
         List<String> outcomes = responses.stream().map(this::outcome).toList();
@@ -161,14 +114,12 @@ class PaymentWebhookIT {
 
     @Test
     void test012_sameTransactionUnderDifferentEventIdsConcurrentlyIsPaidOnce() throws Exception {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         String transactionId = "txn_multi_" + shortId();
         String eventPrefix = "evt_multi_" + shortId() + "_";
 
-        List<HttpResponse<String>> responses = sendConcurrently(4, i -> {
-            byte[] body = payload(eventPrefix + i, transactionId, orderId, "CAPTURED", "500000.00", "VND");
-            return post(PROVIDER, body, signatureHeaders(sign(SECRET, body)));
-        });
+        List<HttpResponse<String>> responses = responses(runConcurrently(4, i -> postSignedWebhook(
+                payload(eventPrefix + i, transactionId, orderId, "CAPTURED", "500000.00", "VND"))));
 
         assertThat(responses).allSatisfy(r -> assertThat(r.statusCode()).isEqualTo(200));
         List<String> outcomes = responses.stream().map(this::outcome).toList();
@@ -184,7 +135,7 @@ class PaymentWebhookIT {
 
     @Test
     void test012_databaseRejectsDuplicateEventAndTransactionIds() {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_sql_" + shortId();
         String transactionId = "txn_sql_" + shortId();
         String insertEvent = "INSERT INTO payment_webhook_events "
@@ -207,11 +158,11 @@ class PaymentWebhookIT {
 
     @Test
     void amountMismatchIsRecordedAndAuditedButNeverMarksTheOrderPaid() throws Exception {
-        UUID orderId = seedPendingOrder();
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_amount_" + shortId();
         byte[] body = payload(eventId, "txn_amount_" + shortId(), orderId, "CAPTURED", "1000.00", "VND");
 
-        HttpResponse<String> response = post(PROVIDER, body, signatureHeaders(sign(SECRET, body)));
+        HttpResponse<String> response = postSignedWebhook(body);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(outcome(response)).isEqualTo("REJECTED_AMOUNT_MISMATCH");
@@ -227,17 +178,17 @@ class PaymentWebhookIT {
     }
 
     @Test
-    void timestampSignedWebhookIsAccepted() throws Exception {
-        UUID orderId = seedPendingOrder();
+    void v1SignatureWithPaddedHeadersIsAccepted() throws Exception {
+        UUID orderId = seedPendingOrder().orderId();
         String eventId = "evt_ts_" + shortId();
         String transactionId = "txn_ts_" + shortId();
         byte[] body = payload(eventId, transactionId, orderId, "CAPTURED", "500000.00", "VND");
         String timestamp = Long.toString(Instant.now().getEpochSecond());
         Map<String, String> headers = new LinkedHashMap<>();
-        headers.put("X-Payment-Signature", sign(SECRET, timestamp, body));
+        headers.put("X-Payment-Signature", sign(SECRET, timestamp, body).toUpperCase());
         headers.put("X-Payment-Timestamp", timestamp);
 
-        HttpResponse<String> response = post(PROVIDER, body, headers);
+        HttpResponse<String> response = postWebhook(PROVIDER, body, headers);
 
         assertThat(response.statusCode()).isEqualTo(200);
         assertThat(outcome(response)).isEqualTo("PROCESSED");
@@ -273,84 +224,8 @@ class PaymentWebhookIT {
     }
 
     private void assertOrderState(UUID orderId, String status, String paymentStatus) {
-        Map<String, Object> row = jdbc.queryForMap("SELECT status, payment_status FROM orders WHERE id = ?", orderId);
+        Map<String, Object> row = orderRow(orderId);
         assertThat(row.get("status")).isEqualTo(status);
         assertThat(row.get("payment_status")).isEqualTo(paymentStatus);
-    }
-
-    private UUID seedPendingOrder() {
-        UUID branchId = UUID.randomUUID();
-        UUID customerId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
-        String suffix = shortId();
-        jdbc.update(
-                "INSERT INTO branches (id, code, name, street_address, district, city, phone, latitude, longitude, "
-                        + "operating_hours) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                branchId, "IT-" + suffix, "IT Branch " + suffix, "1 Test Street", "District 1", "Ho Chi Minh City",
-                "0280000000", new BigDecimal("10.776900"), new BigDecimal("106.700900"), "08:00-20:00");
-        jdbc.update(
-                "INSERT INTO customers (id, email, password_hash, full_name, phone) VALUES (?, ?, ?, ?, ?)",
-                customerId, "it-" + suffix + "@example.test", "not-a-real-hash", "IT Customer", "0900000000");
-        jdbc.update(
-                "INSERT INTO orders (id, order_number, customer_id, processing_branch_id, fulfilment_type, status, "
-                        + "payment_status, currency_code, items_subtotal, delivery_fee, discount_amount, total_amount, "
-                        + "recipient_name, recipient_phone) "
-                        + "VALUES (?, ?, ?, ?, 'PICKUP', 'PENDING_PAYMENT', 'UNPAID', 'VND', ?, 0, 0, ?, ?, ?)",
-                orderId, "IT-" + orderId, customerId, branchId, TOTAL, TOTAL, "IT Recipient", "0900000000");
-        return orderId;
-    }
-
-    private HttpResponse<String> post(String provider, byte[] body, Map<String, String> headers) throws Exception {
-        HttpRequest.Builder request = HttpRequest.newBuilder(
-                        URI.create("http://localhost:" + port + "/api/v1/webhooks/payments/" + provider))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body));
-        headers.forEach(request::header);
-        return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
-    }
-
-    private static Map<String, String> signatureHeaders(String signature) {
-        return Map.of("X-Payment-Signature", signature);
-    }
-
-    private interface Delivery {
-        HttpResponse<String> send(int index) throws Exception;
-    }
-
-    private static List<HttpResponse<String>> sendConcurrently(int count, Delivery delivery) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(count);
-        CountDownLatch start = new CountDownLatch(1);
-        try {
-            List<Future<HttpResponse<String>>> futures = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                int index = i;
-                Callable<HttpResponse<String>> task = () -> {
-                    start.await();
-                    return delivery.send(index);
-                };
-                futures.add(pool.submit(task));
-            }
-            start.countDown();
-            List<HttpResponse<String>> responses = new ArrayList<>();
-            for (Future<HttpResponse<String>> future : futures) {
-                responses.add(future.get(60, TimeUnit.SECONDS));
-            }
-            return responses;
-        } finally {
-            pool.shutdownNow();
-        }
-    }
-
-    private String outcome(HttpResponse<String> response) {
-        return objectMapper.readTree(response.body()).path("outcome").asString();
-    }
-
-    private long count(String sql, Object... args) {
-        Long value = jdbc.queryForObject(sql, Long.class, args);
-        return value == null ? 0 : value;
-    }
-
-    private static String shortId() {
-        return UUID.randomUUID().toString().substring(0, 8);
     }
 }
