@@ -13,10 +13,15 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-@Component
+/**
+ * Resolves a bearer token to a {@link FlowerChainPrincipal} through the registered {@link TokenPrincipalResolver}s.
+ *
+ * <p>Deliberately <b>not</b> a Spring bean: {@link SecurityConfig} creates it and adds it to the security filter
+ * chain only. A {@code @Component} filter would also be registered by Spring Boot as a plain servlet filter for every
+ * request, outside the security chain (TASK-018).
+ */
 public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
     private final ObjectProvider<TokenPrincipalResolver> resolversProvider;

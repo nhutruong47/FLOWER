@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -38,7 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderService implements OrderApi {
 
-    private static final AtomicLong ORDER_SEQUENCE = new AtomicLong(2000L);
     private static final BigDecimal DEFAULT_DELIVERY_FEE = new BigDecimal("35000.00");
 
     private final OrderRepository orderRepository;
@@ -166,7 +164,8 @@ public class OrderService implements OrderApi {
             Instant requestedSlotEnd,
             String confirmedTotalAmount,
             List<OrderItemInputDto> items) {
-        customerApi.getCustomerOrThrow(customerId);
+        // A disabled customer must not place orders, even with a token issued before the account was disabled.
+        customerApi.getActiveCustomerOrThrow(customerId);
         String normalizedFulfilment = fulfilmentType.trim().toUpperCase(Locale.ROOT);
         if ("DELIVERY".equals(normalizedFulfilment)) {
             if (deliveryStreetAddress == null || deliveryStreetAddress.isBlank()
@@ -236,7 +235,7 @@ public class OrderService implements OrderApi {
         Instant reservationExpiresAt = "PENDING_PAYMENT".equals(initialStatus)
                 ? now.plus(Duration.ofMinutes(15))
                 : null;
-        String orderNumber = "ORD-" + ORDER_SEQUENCE.incrementAndGet();
+        String orderNumber = "ORD-" + orderRepository.nextOrderNumber();
 
         OrderEntity savedOrder = orderRepository.save(new OrderEntity(
                 orderId,

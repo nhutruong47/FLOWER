@@ -14,11 +14,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -85,6 +88,37 @@ public class GlobalExceptionHandler {
                 .body(problem);
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ProblemDetail> handleMissingParameter(
+            MissingServletRequestParameterException ex, HttpServletRequest request) {
+        return badRequest(
+                "MISSING_REQUIRED_PARAMETER",
+                "Missing required parameter",
+                "Required query parameter '" + ex.getParameterName() + "' is missing.",
+                request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        // The rejected value is not echoed back: it is client input and may be arbitrarily long.
+        return badRequest(
+                "INVALID_PARAMETER_FORMAT",
+                "Invalid parameter format",
+                "Parameter '" + ex.getName() + "' has an invalid format.",
+                request);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> handleUnreadableBody(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+        return badRequest(
+                "MALFORMED_REQUEST_BODY",
+                "Malformed request body",
+                "The request body is missing or is not valid JSON for this endpoint.",
+                request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleUnexpectedException(
             Exception ex, HttpServletRequest request) {
@@ -100,6 +134,20 @@ public class GlobalExceptionHandler {
         problem.setProperty("requestId", requestId);
         problem.setProperty("timestamp", Instant.now(clock).toString());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problem);
+    }
+
+    private ResponseEntity<ProblemDetail> badRequest(
+            String errorCode, String title, String detail, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setType(URI.create("https://flowerchain.com/problems/" + errorCode.toLowerCase().replace('_', '-')));
+        problem.setTitle(title);
+        problem.setInstance(URI.create(request.getRequestURI()));
+        problem.setProperty("errorCode", errorCode);
+        problem.setProperty("requestId", resolveRequestId(request));
+        problem.setProperty("timestamp", Instant.now(clock).toString());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .body(problem);
     }

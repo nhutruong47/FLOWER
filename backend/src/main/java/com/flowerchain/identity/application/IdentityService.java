@@ -153,14 +153,17 @@ public class IdentityService implements TokenPrincipalResolver {
         return buildDto(user);
     }
 
-    @Transactional
+    // noRollbackFor: the failed-login audit entry is written before the 401 exception is thrown and must be
+    // committed, not rolled back with it. The failure path writes nothing else.
+    @Transactional(noRollbackFor = FlowerChainException.class)
     public StaffAuthResult login(String email, String rawPassword) {
         String normalizedEmail = email.trim().toLowerCase();
         Optional<StaffUserEntity> found = userRepository.findByEmailIgnoreCase(normalizedEmail);
         Instant now = Instant.now(clock);
-        if (found.isEmpty()
-                || !"ACTIVE".equalsIgnoreCase(found.get().getStatus())
-                || !passwordEncoder.matches(rawPassword, found.get().getPasswordHash())) {
+        String failureReason = loginFailureReason(found, rawPassword);
+        if (failureReason != null) {
+            // The submitted email and password are never written to the audit log (PII, TASK-018). A known
+            // account is identified by its ID; the reason code tells reviewers why the attempt failed.
             auditApi.record(new AuditEntryCommand(
                     "LOGIN",
                     "STAFF_LOGIN_FAILURE",
@@ -170,7 +173,7 @@ public class IdentityService implements TokenPrincipalResolver {
                     null,
                     "STAFF",
                     null,
-                    "{\"email\":\"" + normalizedEmail + "\"}"));
+                    "{\"reason\":\"" + failureReason + "\"}"));
             throw FlowerChainException.unauthorized("AUTH_UNAUTHORIZED", "Invalid email or password.");
         }
         StaffUserEntity user = found.get();
@@ -231,6 +234,20 @@ public class IdentityService implements TokenPrincipalResolver {
                     return FlowerChainPrincipal.staff(
                             dto.id(), dto.email(), dto.roles(), dto.authorizedBranchIds());
                 });
+    }
+
+    /** Audit reason code for a failed login, or {@code null} when the credentials are valid for an active account. */
+    private String loginFailureReason(Optional<StaffUserEntity> found, String rawPassword) {
+        if (found.isEmpty()) {
+            return "UNKNOWN_ACCOUNT";
+        }
+        if (!"ACTIVE".equalsIgnoreCase(found.get().getStatus())) {
+            return "ACCOUNT_NOT_ACTIVE";
+        }
+        if (!passwordEncoder.matches(rawPassword, found.get().getPasswordHash())) {
+            return "INVALID_PASSWORD";
+        }
+        return null;
     }
 
     private void validateRolesAndBranches(Set<String> roles, Set<UUID> authorizedBranchIds) {

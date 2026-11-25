@@ -58,7 +58,7 @@ public class InventoryController {
             @NotBlank @Size(min = 2, max = 200) String supplierName,
             @Size(max = 100) String supplierReference,
             @Size(max = 500) String note,
-            @NotEmpty @Valid List<GoodsReceiptLineRequest> lines) {}
+            @NotEmpty List<@Valid GoodsReceiptLineRequest> lines) {}
 
     public record CreateStockAdjustmentRequest(
             @NotNull UUID productId,
@@ -72,13 +72,13 @@ public class InventoryController {
             @NotNull UUID sourceBranchId,
             @NotNull UUID targetBranchId,
             @Size(max = 500) String note,
-            @NotEmpty @Valid List<TransferRequestLine> lines) {}
+            @NotEmpty List<@Valid TransferRequestLine> lines) {}
 
     public record TransferDispatchLine(@NotNull UUID productId, @Min(1) int dispatchedQuantity) {}
 
     public record DispatchStockTransferRequest(
             @Size(max = 500) String note,
-            @NotEmpty @Valid List<TransferDispatchLine> lines) {}
+            @NotEmpty List<@Valid TransferDispatchLine> lines) {}
 
     public record TransferReceiveLine(
             @NotNull UUID productId,
@@ -87,7 +87,7 @@ public class InventoryController {
 
     public record ReceiveStockTransferRequest(
             @Size(max = 500) String note,
-            @NotEmpty @Valid List<TransferReceiveLine> lines) {}
+            @NotEmpty List<@Valid TransferReceiveLine> lines) {}
 
     @GetMapping("/api/v1/storefront/branches/{branchId}/products")
     public PageResponse<StorefrontProductViewDto> listStorefrontBranchProducts(
