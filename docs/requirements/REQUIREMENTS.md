@@ -1,7 +1,7 @@
 # Requirements register
 
 - **Status:** DRAFT. No requirement is approved yet (awaiting owner sign-off at Phase 3 gate before P05).
-- **Last updated:** 2026-11-24
+- **Last updated:** 2026-11-25
 - **Statuses:** `DRAFT` (captured, not yet approved) · `NEEDS_CONFIRMATION` (unclear or conditional, needs an owner decision) · `APPROVED` (signed off in Phase 3, may be built) · `REJECTED` · `SUPERSEDED` (link the replacement)
 - **Detailed P04 Requirement Specifications in this folder:**
   - [functional-requirements.md](functional-requirements.md): Detailed Functional Requirements (`FR-001` to `FR-038`) with priority, source, preconditions, main/alternative/exception flows, testable acceptance criteria, dependencies, and linked business rules.
@@ -35,6 +35,7 @@
 | REQ-015 | Branches can transfer stock to each other, and every transfer is recorded. | Business rule | Owner answer, 2026-11-23 (B2) | DRAFT | Must respect REQ-007 and REQ-008. Open: who requests and approves, stock in transit (B12); shortfalls, damage, cancellation (B16). Process: [stock transfer](../business-analysis/processes/stock-transfer.md) |
 | REQ-016 | There is no central warehouse: all stock is held by branches. | Business rule | Owner answer, 2026-11-23 (B2): "an additional central warehouse" was offered and not chosen | DRAFT | CONFIRMED by the owner's choice between alternatives. Refines REQ-002 |
 | REQ-017 | The storefront shows product prices of the branch the customer chose. | Feature | Owner answer, 2026-11-23 (B9) | NEEDS_CONFIRMATION | Conflicts with B3b and REQ-014: the system, not the customer, picks the branch. Resolve through B11. Depends on REQ-004 |
+| REQ-018 | Home delivery orders are delivered by linked third-party courier services (Grab, Shopee, Be and others), and a delivery fee applies to delivery orders. | Business rule | Owner answer, 2026-11-25 (B15): "SHIP GIAO MẤT PHÍ CHO SHIP, CÓ LIÊN KẾT GRAB, SHOPEE, BE,.." | DRAFT | Refines REQ-013. Open: who pays the fee (B15a); how it is calculated (B15b); automatic API booking or manual booking by staff, and whether staff also deliver (B15c); delivery date and time (B15d) |
 
 ## Draft acceptance criteria
 
@@ -74,3 +75,9 @@ Drafted in Phase 2 (TASK-006) from the owner's answers of 2026-11-23. They are n
 #### REQ-017 acceptance criteria
 - AC1: Given branches A and B have different prices for product P, and A is the branch the customer chose, when the customer views P on the storefront, then the storefront shows A's price.
 - AC pending: B11 (how the customer's branch is set while browsing, given that the system picks the processing branch; which price the customer pays if the processing branch differs).
+
+#### REQ-018 acceptance criteria
+- AC1: Given a delivery order has been handed to a courier, when the order is viewed in the admin, then it shows which courier service carries it (for example Grab, Shopee or Be) and the courier's tracking reference.
+- AC2: Given a delivery order, when the order is placed, then its delivery fee is stored separately from the items subtotal and is part of the order snapshot (REQ-006).
+- AC3: Given a pickup order, when the order is placed, then no delivery fee is charged.
+- AC pending: B15a (who pays the fee), B15b (how the fee is calculated), B15c (automatic or manual courier booking), B15d (delivery date and time).
