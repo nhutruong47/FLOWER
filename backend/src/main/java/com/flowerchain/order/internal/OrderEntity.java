@@ -147,12 +147,24 @@ public class OrderEntity {
         this.updatedAt = now;
     }
 
-    public void markPaidAndConfirmed(Instant now) {
-        this.paymentStatus = "PAID";
-        if ("PENDING_PAYMENT".equals(this.status)) {
-            this.status = "CONFIRMED";
+    /**
+     * Applies a server-verified payment capture (REQ-009, REQ-010).
+     *
+     * <p>Only an order that is still waiting for its online payment ({@code PENDING_PAYMENT} with payment
+     * status {@code UNPAID}) may become {@code PAID} and {@code CONFIRMED}. Any other state means the event is
+     * stale or out of order (the order was cancelled, is already paid, or is not an online-payment order), so
+     * the order is left untouched.
+     *
+     * @return {@code true} if the order was marked paid, {@code false} if it was left unchanged
+     */
+    public boolean markPaidAndConfirmed(Instant now) {
+        if (!"PENDING_PAYMENT".equals(this.status) || !"UNPAID".equals(this.paymentStatus)) {
+            return false;
         }
+        this.paymentStatus = "PAID";
+        this.status = "CONFIRMED";
         this.updatedAt = now;
+        return true;
     }
 
     public void markPaymentStatus(String newPaymentStatus, Instant now) {

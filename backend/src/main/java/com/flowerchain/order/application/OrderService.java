@@ -27,12 +27,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -596,14 +598,32 @@ public class OrderService implements OrderApi {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<OrderForPaymentDto> lockOrderForPaymentProcessing(UUID orderId) {
+        return orderRepository.findByIdForUpdate(orderId).map(order -> new OrderForPaymentDto(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getCustomerId(),
+                order.getProcessingBranchId(),
+                order.getStatus(),
+                order.getPaymentStatus(),
+                order.getTotalAmount(),
+                order.getCurrencyCode()));
+    }
+
+    @Override
     @Transactional
-    public void markOrderPaidByVerifiedWebhook(UUID orderId, UUID paymentId, String providerTransactionId) {
+    public VerifiedPaymentApplication markOrderPaidByVerifiedWebhook(
+            UUID orderId, UUID paymentId, String providerTransactionId) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         String fromStatus = order.getStatus();
         Instant now = Instant.now(clock);
-        order.markPaidAndConfirmed(now);
+        if (!order.markPaidAndConfirmed(now)) {
+            // Stale or out-of-order capture (cancelled, already paid, not an online-payment order): no writes.
+            return VerifiedPaymentApplication.IGNORED_STALE;
+        }
         orderRepository.save(order);
 
         statusHistoryRepository.save(new OrderStatusHistoryEntity(
@@ -636,6 +656,7 @@ public class OrderService implements OrderApi {
                 order.getProcessingBranchId(),
                 fromStatus,
                 order.getStatus()));
+        return VerifiedPaymentApplication.APPLIED;
     }
 
     @Override
