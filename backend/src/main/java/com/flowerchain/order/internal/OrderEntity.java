@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -87,6 +88,15 @@ public class OrderEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /**
+     * Optimistic-locking safety net (security review F1): a stale write fails instead of silently overwriting a
+     * concurrent payment or status change. Order mutators also take the row lock first. A wrapper type, so a
+     * new order ({@code null}) is persisted rather than merged.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     protected OrderEntity() {}
 
     public OrderEntity(
@@ -147,12 +157,24 @@ public class OrderEntity {
         this.updatedAt = now;
     }
 
-    public void markPaidAndConfirmed(Instant now) {
-        this.paymentStatus = "PAID";
-        if ("PENDING_PAYMENT".equals(this.status)) {
-            this.status = "CONFIRMED";
+    /**
+     * Applies a server-verified payment capture (REQ-009, REQ-010).
+     *
+     * <p>Only an order that is still waiting for its online payment ({@code PENDING_PAYMENT} with payment
+     * status {@code UNPAID}) may become {@code PAID} and {@code CONFIRMED}. Any other state means the event is
+     * stale or out of order (the order was cancelled, is already paid, or is not an online-payment order), so
+     * the order is left untouched.
+     *
+     * @return {@code true} if the order was marked paid, {@code false} if it was left unchanged
+     */
+    public boolean markPaidAndConfirmed(Instant now) {
+        if (!"PENDING_PAYMENT".equals(this.status) || !"UNPAID".equals(this.paymentStatus)) {
+            return false;
         }
+        this.paymentStatus = "PAID";
+        this.status = "CONFIRMED";
         this.updatedAt = now;
+        return true;
     }
 
     public void markPaymentStatus(String newPaymentStatus, Instant now) {
@@ -263,5 +285,9 @@ public class OrderEntity {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public Long getVersion() {
+        return version;
     }
 }

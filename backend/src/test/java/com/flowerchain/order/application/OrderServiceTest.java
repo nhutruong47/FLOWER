@@ -228,7 +228,8 @@ class OrderServiceTest {
     @Test
     void branchStaffCannotChangeTheStatusOfAnOrderOfAnotherBranch() {
         OrderEntity orderAtB = orderAt(BRANCH_B);
-        when(orderRepository.findById(orderAtB.getId())).thenReturn(Optional.of(orderAtB));
+        // Staff transitions lock the order row (TASK-017 review F1), so the locking lookup is stubbed.
+        when(orderRepository.findByIdForUpdate(orderAtB.getId())).thenReturn(Optional.of(orderAtB));
 
         assertThatThrownBy(() -> service.transitionOrderStatusByStaff(
                         orderAtB.getId(), "CANCELLED", "forged", UUID.randomUUID(), false, Set.of(BRANCH_A)))

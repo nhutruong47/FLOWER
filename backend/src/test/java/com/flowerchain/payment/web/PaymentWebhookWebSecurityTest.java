@@ -1,0 +1,308 @@
+package com.flowerchain.payment.web;
+
+import static com.flowerchain.payment.WebhookTestSignatures.OTHER_SECRET;
+import static com.flowerchain.payment.WebhookTestSignatures.SECRET;
+import static com.flowerchain.payment.WebhookTestSignatures.payload;
+import static com.flowerchain.payment.WebhookTestSignatures.sign;
+import static com.flowerchain.payment.WebhookTestSignatures.signBodyOnly;
+import static org.hamcrest.Matchers.containsString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.flowerchain.payment.application.PaymentRefundService;
+import com.flowerchain.payment.application.PaymentWebhookEventProcessor;
+import com.flowerchain.payment.application.PaymentWebhookService;
+import com.flowerchain.payment.application.WebhookOutcome;
+import com.flowerchain.payment.gateway.SandboxHmacPaymentGateway;
+import com.flowerchain.payment.gateway.VerifiedPaymentEvent;
+import com.flowerchain.shared.api.BranchAuthorizationGuard;
+import com.flowerchain.shared.api.IdempotencyExecutor;
+import com.flowerchain.shared.security.SecurityConfig;
+import com.flowerchain.shared.security.TokenAuthenticationFilter;
+import com.flowerchain.shared.web.GlobalExceptionHandler;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+
+/**
+ * Web + security slice (TEST-011, REQ-009): the real SecurityConfig, controller, webhook service, sandbox gateway
+ * and exception handler, with the transactional processor mocked. Built with plain spring-test because Boot 4
+ * moved {@code @WebMvcTest} into a module this project does not depend on. The gateway is declared as a bean
+ * here, i.e. "enabled"; its OFF-by-default switch is covered by SandboxHmacPaymentGatewayActivationTest.
+ */
+@SpringJUnitWebConfig(PaymentWebhookWebSecurityTest.SliceConfig.class)
+class PaymentWebhookWebSecurityTest {
+
+    private static final Instant NOW = Instant.parse("2026-11-25T08:00:00Z");
+    private static final String TS = Long.toString(NOW.getEpochSecond());
+    private static final UUID ORDER_ID = UUID.fromString("00000000-0000-0000-0000-00000000a001");
+    private static final String WEBHOOK_URL = "/api/v1/webhooks/payments/sandbox-hmac";
+
+    @Configuration
+    @EnableWebMvc
+    @Import({
+        SecurityConfig.class,
+        TokenAuthenticationFilter.class,
+        GlobalExceptionHandler.class,
+        BranchAuthorizationGuard.class,
+        PaymentWebhookController.class,
+        AdminPaymentRefundController.class,
+        PaymentWebhookService.class
+    })
+    static class SliceConfig {
+
+        @Bean
+        Clock clock() {
+            return Clock.fixed(NOW, ZoneOffset.UTC);
+        }
+
+        @Bean
+        ObjectMapper objectMapper() {
+            return JsonMapper.builder().build();
+        }
+
+        @Bean
+        SandboxHmacPaymentGateway sandboxHmacPaymentGateway(Clock clock, ObjectMapper objectMapper) {
+            return new SandboxHmacPaymentGateway(SECRET, clock, objectMapper);
+        }
+
+        @Bean
+        PaymentWebhookEventProcessor paymentWebhookEventProcessor() {
+            return mock(PaymentWebhookEventProcessor.class);
+        }
+
+        @Bean
+        PaymentRefundService paymentRefundService() {
+            return mock(PaymentRefundService.class);
+        }
+
+        @Bean
+        IdempotencyExecutor idempotencyExecutor() {
+            return mock(IdempotencyExecutor.class);
+        }
+    }
+
+    @Autowired
+    private WebApplicationContext context;
+
+    @Autowired
+    private PaymentWebhookEventProcessor processor;
+
+    @Autowired
+    private PaymentRefundService refundService;
+
+    @Autowired
+    private IdempotencyExecutor idempotencyExecutor;
+
+    private MockMvc mvc;
+
+    @BeforeEach
+    void setUp() {
+        reset(processor, refundService, idempotencyExecutor);
+        mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+    }
+
+    @Test
+    void forgedSignatureWithoutTokenGets401ProblemFromTheVerifierAndNoProcessing() throws Exception {
+        byte[] body = capturedPayload();
+
+        mvc.perform(signedPost(WEBHOOK_URL, body, sign(OTHER_SECRET, TS, body), TS))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                // Our verifier answered (not the security entry point's AUTH_UNAUTHORIZED): the route is public.
+                .andExpect(content().string(containsString("PAYMENT_WEBHOOK_SIGNATURE_INVALID")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void missingSignatureGets401ProblemAndNoProcessing() throws Exception {
+        mvc.perform(signedPost(WEBHOOK_URL, capturedPayload(), null, TS))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(content().string(containsString("PAYMENT_WEBHOOK_SIGNATURE_INVALID")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void missingTimestampGets401EvenWithABodyOnlySignature() throws Exception {
+        byte[] body = capturedPayload();
+
+        mvc.perform(signedPost(WEBHOOK_URL, body, signBodyOnly(SECRET, body), null))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("PAYMENT_WEBHOOK_SIGNATURE_INVALID")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void tamperedBodyGets401ProblemAndNoProcessing() throws Exception {
+        byte[] signedBody = capturedPayload();
+        byte[] sentBody = payload("evt_1001", "txn_9001", ORDER_ID, "CAPTURED", "1", "VND");
+
+        mvc.perform(signedPost(WEBHOOK_URL, sentBody, sign(SECRET, TS, signedBody), TS))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void validSignatureWithoutTokenIsProcessedAndAcknowledged() throws Exception {
+        byte[] body = capturedPayload();
+        when(processor.process(any(VerifiedPaymentEvent.class))).thenReturn(WebhookOutcome.PROCESSED);
+
+        mvc.perform(signedPost(WEBHOOK_URL, body, sign(SECRET, TS, body), TS))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.eventId").value("evt_1001"))
+                .andExpect(jsonPath("$.outcome").value("PROCESSED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"vnpay", "momo"})
+    void undecidedProvidersGet400ProblemAndNoProcessing(String provider) throws Exception {
+        byte[] body = capturedPayload();
+
+        mvc.perform(signedPost("/api/v1/webhooks/payments/" + provider, body, sign(SECRET, TS, body), TS))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(content().string(containsString("PAYMENT_PROVIDER_NOT_SUPPORTED")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void unsupportedProviderIsRejectedEvenWithAnOversizedBody() throws Exception {
+        // F8b: the provider is resolved before the body is read, so this is 400, not 413.
+        byte[] body = new byte[PaymentWebhookController.MAX_BODY_BYTES + 1];
+
+        mvc.perform(signedPost("/api/v1/webhooks/payments/vnpay", body, "00".repeat(32), TS))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("PAYMENT_PROVIDER_NOT_SUPPORTED")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void oversizedBodyGets413ProblemAndNoProcessing() throws Exception {
+        byte[] body = new byte[PaymentWebhookController.MAX_BODY_BYTES + 1];
+
+        mvc.perform(signedPost(WEBHOOK_URL, body, sign(SECRET, TS, body), TS))
+                .andExpect(status().isContentTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void getOnTheWebhookRouteIsDeniedBySecurity() throws Exception {
+        mvc.perform(get(WEBHOOK_URL))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("AUTH_UNAUTHORIZED")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void putOnTheWebhookRouteIsDeniedBySecurity() throws Exception {
+        byte[] body = capturedPayload();
+
+        mvc.perform(put(WEBHOOK_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header(SandboxHmacPaymentGateway.SIGNATURE_HEADER, sign(SECRET, TS, body))
+                        .header(SandboxHmacPaymentGateway.TIMESTAMP_HEADER, TS)
+                        .content(body))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("AUTH_UNAUTHORIZED")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/api/v1/webhooks/payments/sandbox-hmac/extra",
+        "/api/v1/webhooks/payments/sandbox-hmac/",
+        "/api/v1/webhooks/payments"
+    })
+    void postOutsideTheSingleSegmentWebhookPatternIsDeniedBySecurity(String path) throws Exception {
+        byte[] body = capturedPayload();
+
+        mvc.perform(signedPost(path, body, sign(SECRET, TS, body), TS))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("AUTH_UNAUTHORIZED")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void emptyProviderSegmentIsPermittedBySecurityButHasNoHandler() throws Exception {
+        // The permitAll pattern '/api/v1/webhooks/payments/*' also matches an empty last segment. No handler exists
+        // for it, so the answer is a 404 Problem and the webhook code is never reached.
+        byte[] body = capturedPayload();
+
+        mvc.perform(signedPost("/api/v1/webhooks/payments/", body, sign(SECRET, TS, body), TS))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(content().string(containsString("RESOURCE_NOT_FOUND")));
+
+        verifyNoInteractions(processor);
+    }
+
+    @Test
+    void refundRouteRequiresAuthentication() throws Exception {
+        mvc.perform(post("/api/v1/admin/payments/" + UUID.randomUUID() + "/refunds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "key-1")
+                        .content("{\"refundAmount\":\"1000\",\"reason\":\"Customer cancelled\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().string(containsString("AUTH_UNAUTHORIZED")));
+
+        verifyNoInteractions(refundService, idempotencyExecutor);
+    }
+
+    private static byte[] capturedPayload() {
+        return payload("evt_1001", "txn_9001", ORDER_ID, "CAPTURED", "500000", "VND");
+    }
+
+    private static MockHttpServletRequestBuilder signedPost(
+            String url, byte[] body, String signature, String timestamp) {
+        MockHttpServletRequestBuilder request = post(url).contentType(MediaType.APPLICATION_JSON).content(body);
+        if (signature != null) {
+            request.header(SandboxHmacPaymentGateway.SIGNATURE_HEADER, signature);
+        }
+        if (timestamp != null) {
+            request.header(SandboxHmacPaymentGateway.TIMESTAMP_HEADER, timestamp);
+        }
+        return request;
+    }
+}

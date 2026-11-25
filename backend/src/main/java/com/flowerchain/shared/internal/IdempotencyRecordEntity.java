@@ -65,12 +65,23 @@ public class IdempotencyRecordEntity {
         this.updatedAt = now;
     }
 
+    /** Stores the final response of a claimed key, in the same transaction that claimed it. */
+    public void complete(int finalResponseStatus, String finalResponseBody, Instant now) {
+        this.responseStatus = finalResponseStatus;
+        this.responseBody = finalResponseBody;
+        this.updatedAt = now;
+    }
+
     public UUID getId() {
         return id;
     }
 
     public String getRequestHash() {
         return requestHash;
+    }
+
+    public int getResponseStatus() {
+        return responseStatus;
     }
 
     public String getResponseBody() {

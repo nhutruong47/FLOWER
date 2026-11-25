@@ -27,11 +27,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -328,7 +330,7 @@ public class OrderService implements OrderApi {
     @Transactional
     public OrderDetailDto cancelCustomerOrder(UUID customerId, UUID orderId, String reason) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .filter(o -> o.getCustomerId().equals(customerId))
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
 
@@ -429,7 +431,7 @@ public class OrderService implements OrderApi {
             boolean callerHasGlobalAccess,
             Set<UUID> callerAuthorizedBranchIds) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         if (!callerHasGlobalAccess
                 && (callerAuthorizedBranchIds == null || !callerAuthorizedBranchIds.contains(order.getProcessingBranchId()))) {
@@ -510,7 +512,7 @@ public class OrderService implements OrderApi {
             String reason,
             UUID staffActorId) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
 
         if (!"PENDING_PAYMENT".equals(order.getStatus()) && !"CONFIRMED".equals(order.getStatus())) {
@@ -596,14 +598,32 @@ public class OrderService implements OrderApi {
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<OrderForPaymentDto> lockOrderForPaymentProcessing(UUID orderId) {
+        return orderRepository.findByIdForUpdate(orderId).map(order -> new OrderForPaymentDto(
+                order.getId(),
+                order.getOrderNumber(),
+                order.getCustomerId(),
+                order.getProcessingBranchId(),
+                order.getStatus(),
+                order.getPaymentStatus(),
+                order.getTotalAmount(),
+                order.getCurrencyCode()));
+    }
+
+    @Override
     @Transactional
-    public void markOrderPaidByVerifiedWebhook(UUID orderId, UUID paymentId, String providerTransactionId) {
+    public VerifiedPaymentApplication markOrderPaidByVerifiedWebhook(
+            UUID orderId, UUID paymentId, String providerTransactionId) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         String fromStatus = order.getStatus();
         Instant now = Instant.now(clock);
-        order.markPaidAndConfirmed(now);
+        if (!order.markPaidAndConfirmed(now)) {
+            // Stale or out-of-order capture (cancelled, already paid, not an online-payment order): no writes.
+            return VerifiedPaymentApplication.IGNORED_STALE;
+        }
         orderRepository.save(order);
 
         statusHistoryRepository.save(new OrderStatusHistoryEntity(
@@ -636,6 +656,7 @@ public class OrderService implements OrderApi {
                 order.getProcessingBranchId(),
                 fromStatus,
                 order.getStatus()));
+        return VerifiedPaymentApplication.APPLIED;
     }
 
     @Override
@@ -643,7 +664,7 @@ public class OrderService implements OrderApi {
     public void recordOrderRefunded(
             UUID orderId, BigDecimal refundedAmount, boolean fullRefund, UUID staffActorId, String reason) {
         OrderEntity order = orderRepository
-                .findById(orderId)
+                .findByIdForUpdate(orderId)
                 .orElseThrow(() -> FlowerChainException.notFound("Order " + orderId + " not found."));
         String oldPaymentStatus = order.getPaymentStatus();
         String newPaymentStatus = fullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
@@ -788,6 +809,14 @@ public class OrderService implements OrderApi {
                     "INVALID_ORDER_TRANSITION",
                     "Terminal order status",
                     "Order in terminal status " + fromStatus + " cannot transition to " + toStatus + ".");
+        }
+        if ("PENDING_PAYMENT".equals(fromStatus) && !"CANCELLED".equals(toStatus)) {
+            // An unpaid online-payment order is confirmed only by a server-verified payment webhook (REQ-009).
+            throw FlowerChainException.conflict(
+                    "INVALID_ORDER_TRANSITION",
+                    "Order is awaiting payment",
+                    "An order in PENDING_PAYMENT can only be cancelled by staff; it is confirmed only by a "
+                            + "verified payment.");
         }
         if ("READY_FOR_PICKUP".equals(toStatus) && !"PICKUP".equals(fulfilmentType)) {
             throw FlowerChainException.conflict(

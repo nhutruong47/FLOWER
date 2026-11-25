@@ -48,4 +48,9 @@ flowerchain:
   security:
     cors-allowed-origins: ${FLOWERCHAIN_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
   payment:
-    webhook-secret: ${FLOWERCHAIN_PAYMENT_WEBHOOK_SECRET:dev-only-placeholder-webhook-secret-change-in-env}
+    sandbox-hmac:
+      # Sandbox payment provider adapter (ADR-0007). OFF unless explicitly enabled; when off, 'sandbox-hmac'
+      # webhooks are rejected like any unsupported provider. Never enable it in production (TASK-017 review F2).
+      enabled: ${FLOWERCHAIN_PAYMENT_SANDBOX_HMAC_ENABLED:false}
+      # Fails closed: a blank, placeholder or shorter-than-32-character secret rejects every webhook (503).
+      webhook-secret: ${FLOWERCHAIN_PAYMENT_SANDBOX_HMAC_WEBHOOK_SECRET:dev-only-placeholder-webhook-secret-change-in-env}
